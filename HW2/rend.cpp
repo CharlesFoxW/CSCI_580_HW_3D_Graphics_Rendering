@@ -3,10 +3,9 @@
 #include	"math.h"
 #include	"Gz.h"
 #include	"rend.h"
-/*   CS580 HW   */
-#include    "stdafx.h"  
-#include	"Gz.h"
-#include	<bitset>
+
+/***********************************************/
+/* HW1 methods: copy here the methods from HW1 */
 
 #define RGBA_DIMEMSION	4	/* RGBA -> 4D color */
 #define RGB_DIMEMSION	3	/* RGB -> 3D color */
@@ -39,7 +38,7 @@ GzRender::~GzRender()
 int GzRender::GzDefault()
 {
 /* HW1.3 set pixel buffer to some default values - start a new frame */
-	GzPixel defaultPixel = {880, 880, 880, 1, 0};
+	GzPixel defaultPixel = { 880, 880, 880, 1, 0 };
 
 	int resolution = xres * yres;
 	for (int i = 0; i < resolution; i++) {
@@ -48,7 +47,6 @@ int GzRender::GzDefault()
 		framebuffer[RGB_DIMEMSION * i + 1] = (char)880;
 		framebuffer[RGB_DIMEMSION * i + 2] = (char)880;
 	}
-
 	return GZ_SUCCESS;
 }
 
@@ -61,7 +59,6 @@ int GzRender::GzPut(int i, int j, GzIntensity r, GzIntensity g, GzIntensity b, G
 		GzPixel currentPixel = { r, g, b, a, z };
 		pixelbuffer[index] = currentPixel;
 	}
-
 	return GZ_SUCCESS;
 }
 
@@ -89,7 +86,7 @@ int GzRender::GzFlushDisplay2File(FILE* outfile)
 	int resolution = xres * yres;
 	for (int i = 0; i < resolution; i++) {
 		GzPixel currentPixel = pixelbuffer[i];
-	
+
 		GzIntensity gotRed = currentPixel.red;
 		GzIntensity gotGreen = currentPixel.green;
 		GzIntensity gotBlue = currentPixel.blue;
@@ -119,7 +116,6 @@ int GzRender::GzFlushDisplay2File(FILE* outfile)
 		color[2] = blueValue;
 		fwrite(color, 1, 3, outfile);
 	}
-
 	return GZ_SUCCESS;
 }
 
@@ -151,7 +147,7 @@ int GzRender::GzFlushDisplay2FrameBuffer()
 			gotBlue = COLOR_LIMIT;
 
 		GzIntensity red2 = gotRed >> 4;
-		char redValue = (char) (red2 & 0xFF);
+		char redValue = (char)(red2 & 0xFF);
 		framebuffer[RGB_DIMEMSION * i + 2] = redValue;
 
 		GzIntensity green2 = gotGreen >> 4;
@@ -162,7 +158,34 @@ int GzRender::GzFlushDisplay2FrameBuffer()
 		char blueValue = (char)(blue2 & 0xFF);
 		framebuffer[RGB_DIMEMSION * i] = blueValue;
 	}
+	return GZ_SUCCESS;
+}
 
+
+/***********************************************/
+/* HW2 methods: implement from here */
+
+int GzRender::GzPutAttribute(int numAttributes, GzToken	*nameList, GzPointer *valueList) 
+{
+/* HW 2.1
+-- Set renderer attribute states (e.g.: GZ_RGB_COLOR default color)
+-- In later homeworks set shaders, interpolaters, texture maps, and lights
+*/
 
 	return GZ_SUCCESS;
 }
+
+int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueList) 
+/* numParts - how many names and values */
+{
+/* HW 2.2
+-- Pass in a triangle description with tokens and values corresponding to
+      GZ_NULL_TOKEN:		do nothing - no values
+      GZ_POSITION:		3 vert positions in model space
+-- Invoke the rastrizer/scanline framework
+-- Return error code
+*/
+
+	return GZ_SUCCESS;
+}
+
