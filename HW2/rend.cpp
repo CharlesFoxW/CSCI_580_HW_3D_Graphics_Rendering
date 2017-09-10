@@ -58,8 +58,10 @@ int GzRender::GzPut(int i, int j, GzIntensity r, GzIntensity g, GzIntensity b, G
 /* HW1.4 write pixel values into the buffer */
 	if (i >= 0 && i < xres && j >= 0 && j < yres) {
 		int index = ARRAY(i, j);
-		GzPixel currentPixel = { r, g, b, a, z };
-		pixelbuffer[index] = currentPixel;
+		if (z < pixelbuffer[index].z) {
+			GzPixel currentPixel = { r, g, b, a, z };
+			pixelbuffer[index] = currentPixel;
+		}
 	}
 	return GZ_SUCCESS;
 }
@@ -135,6 +137,7 @@ int GzRender::GzFlushDisplay2FrameBuffer()
 		GzIntensity gotRed = currentPixel.red;
 		GzIntensity gotGreen = currentPixel.green;
 		GzIntensity gotBlue = currentPixel.blue;
+		GzDepth gotZ = currentPixel.z;
 		if (currentPixel.red < 0)
 			gotRed = 0;
 		if (currentPixel.red > COLOR_LIMIT)
@@ -159,6 +162,8 @@ int GzRender::GzFlushDisplay2FrameBuffer()
 		GzIntensity blue2 = gotBlue >> 4;
 		char blueValue = (char)(blue2 & 0xFF);
 		framebuffer[RGB_DIMEMSION * i] = blueValue;
+
+		framebuffer[RGB_DIMEMSION * i + 3] = (char)gotZ;
 	}
 	return GZ_SUCCESS;
 }
@@ -179,19 +184,6 @@ int GzRender::GzPutAttribute(int numAttributes, GzToken	*nameList, GzPointer *va
 		flatcolor[0] = color[0];
 		flatcolor[1] = color[1];
 		flatcolor[2] = color[2];
-		//GzColor* color1 = (GzColor*)valueList[1];
-		//flatcolor[1] = *color[1];
-		//GzColor* color2 = (GzColor*)valueList[2];
-		//flatcolor[2] = *color[2];
-		//float* color1 = (float*) *valueList;
-		//flatcolor[0] = *color1;
-		//printf("%d. \n", sizeof(token));
-		//valueList += token;
-		//float* color2 = (float*) *valueList;
-		//flatcolor[1] = *color2;
-		//valueList += token;
-		//float* color3 = (float*) *valueList;
-		//flatcolor[2] = *color3;
 	}
 	return GZ_SUCCESS;
 }
@@ -305,15 +297,63 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 			}
 		}
 		//sorted as CW. 3 edges: 1-2, 2-3, 3-1.
-		float slope12, slope23, slope31;
+		float deltaX12, deltaY12, deltaX23, deltaY23, deltaX31, deltaY31;
+		float A12, B12, C12, A23, B23, C23, A31, B31, C31;
+		deltaX12 = vertices[1][0] - vertices[0][0];
+		deltaY12 = vertices[1][1] - vertices[0][1];
+		deltaX23 = vertices[2][0] - vertices[1][0];
+		deltaY23 = vertices[2][1] - vertices[1][1];
+		deltaX31 = vertices[0][0] - vertices[2][0];
+		deltaY31 = vertices[0][1] - vertices[2][1];
+		A12 = deltaY12;
+		B12 = -1.0 * deltaX12;
+		C12 = deltaX12 * vertices[0][1] - deltaY12 * vertices[0][0];
+		A23 = deltaY23;
+		B23 = -1.0 * deltaX23;
+		C23 = deltaX23 * vertices[1][1] - deltaY23 * vertices[1][0];
+		A31 = deltaY31;
+		B31 = -1.0 * deltaX31;
+		C31 = deltaX31 * vertices[2][1] - deltaY31 * vertices[2][0];
+		// Get the current plane to interpolate Z:
+		float X1 = vertices[1][0] - vertices[0][0];
+		float Y1 = vertices[1][1] - vertices[0][1];
+		float Z1 = vertices[1][2] - vertices[0][2];
+		float X2 = vertices[2][0] - vertices[0][0];
+		float Y2 = vertices[2][1] - vertices[0][1];
+		float Z2 = vertices[2][2] - vertices[0][2];
+		float planeA = (Y1 * Z2) - (Z1 * Y2);
+		float planeB = -((X1 * Z2) - (Z1 * X2));
+		float planeC = (X1 * Y2) - (Y1 * X2);
+		float planeD = -1.0 * (planeA * vertices[0][0] + planeB * vertices[0][1] + planeC * vertices[0][2]);
 
-		
+		// Get Bounding Box:
+		float minX = min(min(vertices[0][0], vertices[1][0]), vertices[2][0]);
+		float maxX = max(max(vertices[0][0], vertices[1][0]), vertices[2][0]);
+		float minY = min(min(vertices[0][1], vertices[1][1]), vertices[2][1]);
+		float maxY = max(max(vertices[0][1], vertices[1][1]), vertices[2][1]);
+		int minXPixel = (int)(minX + 0.5);
+		int maxXPixel = (int)(maxX + 0.5);
+		int minYPixel = (int)(minY + 0.5);
+		int maxYPixel = (int)(maxY + 0.5);
+		// Start Rasterization:
+		for (int i = minXPixel; i < maxXPixel; i++) {
+			for (int j = minYPixel; j < maxYPixel; j++) {
+				//int currentIndex = ARRAY(i, j);
+				float LEE12 = A12 * (float)i + B12 * (float)j + C12;
+				float LEE23 = A23 * (float)i + B23 * (float)j + C23;
+				float LEE31 = A31 * (float)i + B31 * (float)j + C31;
 
-
-
-
-		
-		
+				if ((LEE12 > 0 && LEE23 > 0 && LEE31 > 0) || (LEE12 < 0 && LEE23 < 0 && LEE31 < 0)) {
+					float interpolatedZ = -1.0 * (planeA * (float)i + planeB * (float)j + planeD) / planeC;
+					int currentZ = (int)(interpolatedZ + 0.5);
+					GzIntensity redIntensity = ctoi(flatcolor[0]);
+					GzIntensity greenIntensity = ctoi(flatcolor[1]);
+					GzIntensity blueIntensity = ctoi(flatcolor[2]);
+					// Call GzPut to push the pixel to pixelbuffer.
+					GzPut(i, j, redIntensity, greenIntensity, blueIntensity, 1, currentZ);
+				}
+			}
+		}
 	}
 	return GZ_SUCCESS;
 }
