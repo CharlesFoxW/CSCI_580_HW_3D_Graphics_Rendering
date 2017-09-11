@@ -201,6 +201,7 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 	if (numParts == 1) {
 		GzCoord* verticesPointer = (GzCoord*)valueList[0];
 		GzCoord vertices[3], sortedVertices[3];
+		
 		// V1:
 		vertices[0][0] = verticesPointer[0][0];
 		vertices[0][1] = verticesPointer[0][1];
@@ -213,7 +214,7 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 		vertices[2][0] = verticesPointer[2][0];
 		vertices[2][1] = verticesPointer[2][1];
 		vertices[2][2] = verticesPointer[2][2];
-
+		
 		if (vertices[0][1] > vertices[1][1]) {
 			float tempX, tempY, tempZ;
 			tempX = vertices[0][0];
@@ -250,8 +251,9 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 			vertices[2][1] = tempY;
 			vertices[2][2] = tempZ;
 		}
+
 		//sorted by Y. determine final order by middle-Y & special cases.
-		if (vertices[0][1] == vertices[1][1]) {
+		if ((int)(vertices[0][1] + 0.5) == (int) (vertices[1][1] + 0.5)) {
 			if (vertices[0][0] > vertices[1][0]) {
 				float tempX, tempY, tempZ;
 				tempX = vertices[1][0];
@@ -265,7 +267,7 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 				vertices[2][2] = tempZ;
 			}
 		}
-		else if (vertices[1][1] == vertices[2][1]) {
+		else if ((int) (vertices[1][1] + 0.5) == (int) (vertices[2][1] + 0.5)) {
 			if (vertices[2][0] > vertices[1][0]) {
 				float tempX, tempY, tempZ;
 				tempX = vertices[1][0];
@@ -280,8 +282,14 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 			}
 		}
 		else {
-			float slopeOfSideEdge = (vertices[0][1] - vertices[2][1]) / (vertices[0][0] - vertices[2][0]);
-			float middleX = (vertices[1][1] - vertices[0][1]) / slopeOfSideEdge + vertices[0][0];
+			float slopeOfSideEdge, middleX;
+			if ((int)(vertices[0][0] + 0.5) == (int)(vertices[2][0] + 0.5)) {
+				middleX = vertices[0][0];
+			}
+			else {
+				slopeOfSideEdge = (vertices[0][1] - vertices[2][1]) / (vertices[0][0] - vertices[2][0]);
+				middleX = (vertices[1][1] - vertices[0][1]) / slopeOfSideEdge + vertices[0][0];
+			}
 
 			if (middleX > vertices[1][0]) {
 				float tempX, tempY, tempZ;
@@ -299,20 +307,22 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 		//sorted as CW. 3 edges: 1-2, 2-3, 3-1.
 		float deltaX12, deltaY12, deltaX23, deltaY23, deltaX31, deltaY31;
 		float A12, B12, C12, A23, B23, C23, A31, B31, C31;
+		
 		deltaX12 = vertices[1][0] - vertices[0][0];
 		deltaY12 = vertices[1][1] - vertices[0][1];
 		deltaX23 = vertices[2][0] - vertices[1][0];
 		deltaY23 = vertices[2][1] - vertices[1][1];
 		deltaX31 = vertices[0][0] - vertices[2][0];
 		deltaY31 = vertices[0][1] - vertices[2][1];
+		
 		A12 = deltaY12;
-		B12 = -1.0 * deltaX12;
+		B12 = -1.0f * deltaX12;
 		C12 = deltaX12 * vertices[0][1] - deltaY12 * vertices[0][0];
 		A23 = deltaY23;
-		B23 = -1.0 * deltaX23;
+		B23 = -1.0f * deltaX23;
 		C23 = deltaX23 * vertices[1][1] - deltaY23 * vertices[1][0];
 		A31 = deltaY31;
-		B31 = -1.0 * deltaX31;
+		B31 = -1.0f * deltaX31;
 		C31 = deltaX31 * vertices[2][1] - deltaY31 * vertices[2][0];
 		// Get the current plane to interpolate Z:
 		float X1 = vertices[1][0] - vertices[0][0];
@@ -324,7 +334,7 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 		float planeA = (Y1 * Z2) - (Z1 * Y2);
 		float planeB = -((X1 * Z2) - (Z1 * X2));
 		float planeC = (X1 * Y2) - (Y1 * X2);
-		float planeD = -1.0 * (planeA * vertices[0][0] + planeB * vertices[0][1] + planeC * vertices[0][2]);
+		float planeD = -1.0f * (planeA * vertices[0][0] + planeB * vertices[0][1] + planeC * vertices[0][2]);
 
 		// Get Bounding Box:
 		float minX = min(min(vertices[0][0], vertices[1][0]), vertices[2][0]);
@@ -336,15 +346,15 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 		int minYPixel = (int)(minY + 0.5);
 		int maxYPixel = (int)(maxY + 0.5);
 		// Start Rasterization:
-		for (int i = minXPixel; i < maxXPixel; i++) {
-			for (int j = minYPixel; j < maxYPixel; j++) {
+		for (int i = minXPixel; i <= maxXPixel; i++) {
+			for (int j = minYPixel; j <= maxYPixel; j++) {
 				//int currentIndex = ARRAY(i, j);
 				float LEE12 = A12 * (float)i + B12 * (float)j + C12;
 				float LEE23 = A23 * (float)i + B23 * (float)j + C23;
 				float LEE31 = A31 * (float)i + B31 * (float)j + C31;
 
-				if ((LEE12 > 0 && LEE23 > 0 && LEE31 > 0) || (LEE12 < 0 && LEE23 < 0 && LEE31 < 0)) {
-					float interpolatedZ = -1.0 * (planeA * (float)i + planeB * (float)j + planeD) / planeC;
+				if ((LEE12 >= 0 && LEE23 >= 0 && LEE31 >= 0 && planeC != 0) || (LEE12 < 0 && LEE23 < 0 && LEE31 < 0 && planeC != 0)) {
+					float interpolatedZ = -1.0f * (planeA * (float)i + planeB * (float)j + planeD) / planeC;
 					int currentZ = (int)(interpolatedZ + 0.5);
 					GzIntensity redIntensity = ctoi(flatcolor[0]);
 					GzIntensity greenIntensity = ctoi(flatcolor[1]);
