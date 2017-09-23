@@ -1,9 +1,12 @@
+/* CS580 Homework 3 */
+
 #include	"stdafx.h"
 #include	"stdio.h"
 #include	"math.h"
 #include	"Gz.h"
 #include	"rend.h"
-#include    <string>
+
+#define PI (float) 3.14159265358979323846
 
 /***********************************************/
 /* HW1 methods: copy here the methods from HW1 */
@@ -11,6 +14,58 @@
 #define RGBA_DIMEMSION	4	/* RGBA -> 4D color */
 #define RGB_DIMEMSION	3	/* RGB -> 3D color */
 #define COLOR_LIMIT		4095	/* Clamping the color value into 0~4095. */
+
+int GzRender::GzRotXMat(float degree, GzMatrix mat)
+{
+/* HW 3.1
+// Create rotate matrix : rotate along x axis
+// Pass back the matrix using mat value
+*/
+	
+	return GZ_SUCCESS;
+}
+
+int GzRender::GzRotYMat(float degree, GzMatrix mat)
+{
+/* HW 3.2
+// Create rotate matrix : rotate along y axis
+// Pass back the matrix using mat value
+*/
+
+	return GZ_SUCCESS;
+}
+
+int GzRender::GzRotZMat(float degree, GzMatrix mat)
+{
+/* HW 3.3
+// Create rotate matrix : rotate along z axis
+// Pass back the matrix using mat value
+*/
+
+	return GZ_SUCCESS;
+}
+
+int GzRender::GzTrxMat(GzCoord translate, GzMatrix mat)
+{
+/* HW 3.4
+// Create translation matrix
+// Pass back the matrix using mat value
+*/
+
+	return GZ_SUCCESS;
+}
+
+
+int GzRender::GzScaleMat(GzCoord scale, GzMatrix mat)
+{
+/* HW 3.5
+// Create scaling matrix
+// Pass back the matrix using mat value
+*/
+
+	return GZ_SUCCESS;
+}
+
 
 GzRender::GzRender(int xRes, int yRes)
 {
@@ -24,9 +79,14 @@ GzRender::GzRender(int xRes, int yRes)
 
 	int resolution = 0;
 	resolution = xres * yres;
-	int frameBufferDepth = (RGB_DIMEMSION) * resolution;	// Add 1 as the Z 
+	int frameBufferDepth = (RGB_DIMEMSION)* resolution;	// Add 1 as the Z 
 	framebuffer = new char[frameBufferDepth];
 	pixelbuffer = new GzPixel[resolution];
+
+/* HW 3.6
+- setup Xsp and anything only done once 
+- init default camera 
+*/ 
 }
 
 GzRender::~GzRender()
@@ -52,6 +112,46 @@ int GzRender::GzDefault()
 	return GZ_SUCCESS;
 }
 
+int GzRender::GzBeginRender()
+{
+/* HW 3.7 
+- setup for start of each frame - init frame buffer color,alpha,z
+- compute Xiw and projection xform Xpi from camera definition 
+- init Ximage - put Xsp at base of stack, push on Xpi and Xiw 
+- now stack contains Xsw and app can push model Xforms when needed 
+*/ 
+
+	return GZ_SUCCESS;
+}
+
+int GzRender::GzPutCamera(GzCamera camera)
+{
+/* HW 3.8 
+/*- overwrite renderer camera structure with new camera definition
+*/
+
+	return GZ_SUCCESS;	
+}
+
+int GzRender::GzPushMatrix(GzMatrix	matrix)
+{
+/* HW 3.9 
+- push a matrix onto the Ximage stack
+- check for stack overflow
+*/
+	
+	return GZ_SUCCESS;
+}
+
+int GzRender::GzPopMatrix()
+{
+/* HW 3.10
+- pop a matrix off the Ximage stack
+- check for stack underflow
+*/
+
+	return GZ_SUCCESS;
+}
 
 int GzRender::GzPut(int i, int j, GzIntensity r, GzIntensity g, GzIntensity b, GzIntensity a, GzDepth z)
 {
@@ -188,7 +288,7 @@ int GzRender::GzPutAttribute(int numAttributes, GzToken	*nameList, GzPointer *va
 	return GZ_SUCCESS;
 }
 
-int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueList) 
+int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueList)
 /* numParts - how many names and values */
 {
 /* HW 2.2
@@ -201,7 +301,7 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 	if (numParts == 1) {
 		GzCoord* verticesPointer = (GzCoord*)valueList[0];
 		GzCoord vertices[3], sortedVertices[3];
-		
+
 		// V1:
 		vertices[0][0] = verticesPointer[0][0];
 		vertices[0][1] = verticesPointer[0][1];
@@ -214,7 +314,7 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 		vertices[2][0] = verticesPointer[2][0];
 		vertices[2][1] = verticesPointer[2][1];
 		vertices[2][2] = verticesPointer[2][2];
-		
+
 		if (vertices[0][1] > vertices[1][1]) {
 			float tempX, tempY, tempZ;
 			tempX = vertices[0][0];
@@ -253,7 +353,7 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 		}
 
 		//sorted by Y. determine final order by middle-Y & special cases.
-		if ((int)(vertices[0][1] + 0.5) == (int) (vertices[1][1] + 0.5)) {
+		if ((int)(vertices[0][1] + 0.5) == (int)(vertices[1][1] + 0.5)) {
 			if (vertices[0][0] > vertices[1][0]) {
 				float tempX, tempY, tempZ;
 				tempX = vertices[1][0];
@@ -267,7 +367,7 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 				vertices[2][2] = tempZ;
 			}
 		}
-		else if ((int) (vertices[1][1] + 0.5) == (int) (vertices[2][1] + 0.5)) {
+		else if ((int)(vertices[1][1] + 0.5) == (int)(vertices[2][1] + 0.5)) {
 			if (vertices[2][0] > vertices[1][0]) {
 				float tempX, tempY, tempZ;
 				tempX = vertices[1][0];
@@ -307,14 +407,14 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 		//sorted as CW. 3 edges: 1-2, 2-3, 3-1.
 		float deltaX12, deltaY12, deltaX23, deltaY23, deltaX31, deltaY31;
 		float A12, B12, C12, A23, B23, C23, A31, B31, C31;
-		
+
 		deltaX12 = vertices[1][0] - vertices[0][0];
 		deltaY12 = vertices[1][1] - vertices[0][1];
 		deltaX23 = vertices[2][0] - vertices[1][0];
 		deltaY23 = vertices[2][1] - vertices[1][1];
 		deltaX31 = vertices[0][0] - vertices[2][0];
 		deltaY31 = vertices[0][1] - vertices[2][1];
-		
+
 		A12 = deltaY12;
 		B12 = -1.0f * deltaX12;
 		C12 = deltaX12 * vertices[0][1] - deltaY12 * vertices[0][0];
@@ -353,7 +453,7 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 				float LEE23 = A23 * (float)i + B23 * (float)j + C23;
 				float LEE31 = A31 * (float)i + B31 * (float)j + C31;
 
-				if ((LEE12 > 0 && LEE23 > 0 && LEE31 > 0 && planeC != 0) 
+				if ((LEE12 > 0 && LEE23 > 0 && LEE31 > 0 && planeC != 0)
 					|| (LEE12 < 0 && LEE23 < 0 && LEE31 < 0 && planeC != 0)
 					|| LEE12 == 0 || LEE23 == 0 || LEE31 == 0) { // Any pixel inside or on the 3 edges.
 					float interpolatedZ = -1.0f * (planeA * (float)i + planeB * (float)j + planeD) / planeC;
