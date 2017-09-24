@@ -21,7 +21,19 @@ int GzRender::GzRotXMat(float degree, GzMatrix mat)
 // Create rotate matrix : rotate along x axis
 // Pass back the matrix using mat value
 */
-	
+	float radianAngle = degree * PI / 180.0;
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			mat[i][j] = 0;
+		}
+	}
+	mat[0][0] = 1.0;
+	mat[1][1] = (float)cos((double)radianAngle);
+	mat[1][2] = -1.0 * (float)sin((double)radianAngle);
+	mat[2][1] = (float)sin((double)radianAngle);
+	mat[2][2] = (float)cos((double)radianAngle);
+	mat[3][3] = 1.0;
+
 	return GZ_SUCCESS;
 }
 
@@ -31,6 +43,18 @@ int GzRender::GzRotYMat(float degree, GzMatrix mat)
 // Create rotate matrix : rotate along y axis
 // Pass back the matrix using mat value
 */
+	float radianAngle = degree * PI / 180.0;
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			mat[i][j] = 0;
+		}
+	}
+	mat[0][0] = (float)cos((double)radianAngle);
+	mat[0][2] = (float)sin((double)radianAngle);
+	mat[1][1] = 1.0;
+	mat[2][0] = -1.0 * (float)sin((double)radianAngle);
+	mat[2][2] = (float)cos((double)radianAngle);
+	mat[3][3] = 1.0;
 
 	return GZ_SUCCESS;
 }
@@ -41,6 +65,18 @@ int GzRender::GzRotZMat(float degree, GzMatrix mat)
 // Create rotate matrix : rotate along z axis
 // Pass back the matrix using mat value
 */
+	float radianAngle = degree * PI / 180.0;
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			mat[i][j] = 0;
+		}
+	}
+	mat[0][0] = (float)cos((double)radianAngle);
+	mat[0][1] = -1.0 * (float)sin((double)radianAngle);
+	mat[1][0] = (float)sin((double)radianAngle);
+	mat[1][1] = (float)cos((double)radianAngle);
+	mat[2][2] = 1.0;
+	mat[3][3] = 1.0;
 
 	return GZ_SUCCESS;
 }
@@ -51,6 +87,18 @@ int GzRender::GzTrxMat(GzCoord translate, GzMatrix mat)
 // Create translation matrix
 // Pass back the matrix using mat value
 */
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			mat[i][j] = 0;
+		}
+	}
+	mat[0][0] = 1.0;
+	mat[0][3] = translate[0];
+	mat[1][1] = 1.0;
+	mat[1][3] = translate[1];
+	mat[2][2] = 1.0;
+	mat[2][3] = translate[2];
+	mat[3][3] = 1.0;
 
 	return GZ_SUCCESS;
 }
@@ -62,6 +110,15 @@ int GzRender::GzScaleMat(GzCoord scale, GzMatrix mat)
 // Create scaling matrix
 // Pass back the matrix using mat value
 */
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			mat[i][j] = 0;
+		}
+	}
+	mat[0][0] = scale[0];
+	mat[1][1] = scale[1];
+	mat[2][2] = scale[2];
+	mat[3][3] = 1.0;
 
 	return GZ_SUCCESS;
 }
@@ -124,14 +181,14 @@ GzRender::~GzRender()
 int GzRender::GzDefault()
 {
 /* HW1.3 set pixel buffer to some default values - start a new frame */
-	GzPixel defaultPixel = { 880, 880, 880, 1, MAXINT };
+	GzPixel defaultPixel = { 2880, 2880, 2880, 1, MAXINT };
 
 	int resolution = xres * yres;
 	for (int i = 0; i < resolution; i++) {
 		pixelbuffer[i] = defaultPixel;
-		framebuffer[RGB_DIMEMSION * i] = (char)880;
-		framebuffer[RGB_DIMEMSION * i + 1] = (char)880;
-		framebuffer[RGB_DIMEMSION * i + 2] = (char)880;
+		framebuffer[RGB_DIMEMSION * i] = (char)2880;
+		framebuffer[RGB_DIMEMSION * i + 1] = (char)2880;
+		framebuffer[RGB_DIMEMSION * i + 2] = (char)2880;
 		//framebuffer[RGB_DIMEMSION * i + 3] = (char)MAXINT;	// initialize Z.
 	}
 	return GZ_SUCCESS;
@@ -150,17 +207,17 @@ int GzRender::GzBeginRender()
 	for (int i = 0; i < 3; i++) {
 		cl[i] = m_camera.lookat[i] - m_camera.position[i];
 	}
-	the_Z[0] = cl[0] / (float)sqrt((float)(cl[0] * cl[0] + cl[1] * cl[1] + cl[2] * cl[2]));
-	the_Z[1] = cl[1] / (float)sqrt((float)(cl[0] * cl[0] + cl[1] * cl[1] + cl[2] * cl[2]));
-	the_Z[2] = cl[2] / (float)sqrt((float)(cl[0] * cl[0] + cl[1] * cl[1] + cl[2] * cl[2]));
+	the_Z[0] = cl[0] / (float)sqrt((double)(cl[0] * cl[0] + cl[1] * cl[1] + cl[2] * cl[2]));
+	the_Z[1] = cl[1] / (float)sqrt((double)(cl[0] * cl[0] + cl[1] * cl[1] + cl[2] * cl[2]));
+	the_Z[2] = cl[2] / (float)sqrt((double)(cl[0] * cl[0] + cl[1] * cl[1] + cl[2] * cl[2]));
 
 	float upDotZ = m_camera.worldup[0] * the_Z[0] + m_camera.worldup[1] * the_Z[1] + m_camera.worldup[2] * the_Z[2];
 	newUp[0] = m_camera.worldup[0] - upDotZ * the_Z[0];
 	newUp[1] = m_camera.worldup[1] - upDotZ * the_Z[1];
 	newUp[2] = m_camera.worldup[2] - upDotZ * the_Z[2];
-	the_Y[0] = newUp[0] / (float)sqrt((float)(newUp[0] * newUp[0] + newUp[1] * newUp[1] + newUp[2] * newUp[2]));
-	the_Y[1] = newUp[1] / (float)sqrt((float)(newUp[0] * newUp[0] + newUp[1] * newUp[1] + newUp[2] * newUp[2]));
-	the_Y[2] = newUp[2] / (float)sqrt((float)(newUp[0] * newUp[0] + newUp[1] * newUp[1] + newUp[2] * newUp[2]));
+	the_Y[0] = newUp[0] / (float)sqrt((double)(newUp[0] * newUp[0] + newUp[1] * newUp[1] + newUp[2] * newUp[2]));
+	the_Y[1] = newUp[1] / (float)sqrt((double)(newUp[0] * newUp[0] + newUp[1] * newUp[1] + newUp[2] * newUp[2]));
+	the_Y[2] = newUp[2] / (float)sqrt((double)(newUp[0] * newUp[0] + newUp[1] * newUp[1] + newUp[2] * newUp[2]));
 
 	the_X[0] = the_Y[1] * the_Z[2] - the_Y[2] * the_Z[1];
 	the_X[1] = the_Y[2] * the_Z[0] - the_Y[0] * the_Z[2];
@@ -590,11 +647,13 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 					|| LEE12 == 0 || LEE23 == 0 || LEE31 == 0) { // Any pixel inside or on the 3 edges.
 					float interpolatedZ = -1.0f * (planeA * (float)i + planeB * (float)j + planeD) / planeC;
 					int currentZ = (int)(interpolatedZ + 0.5);
-					GzIntensity redIntensity = ctoi(flatcolor[0]);
-					GzIntensity greenIntensity = ctoi(flatcolor[1]);
-					GzIntensity blueIntensity = ctoi(flatcolor[2]);
-					// Call GzPut to push the pixel to pixelbuffer.
-					GzPut(i, j, redIntensity, greenIntensity, blueIntensity, 1, currentZ);
+					if (currentZ >= 0) {	// Only render when Z >= 0.
+						GzIntensity redIntensity = ctoi(flatcolor[0]);
+						GzIntensity greenIntensity = ctoi(flatcolor[1]);
+						GzIntensity blueIntensity = ctoi(flatcolor[2]);
+						// Call GzPut to push the pixel to pixelbuffer.
+						GzPut(i, j, redIntensity, greenIntensity, blueIntensity, 1, currentZ);
+					}
 				}
 			}
 		}
