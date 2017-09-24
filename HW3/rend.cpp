@@ -87,6 +87,31 @@ GzRender::GzRender(int xRes, int yRes)
 - setup Xsp and anything only done once 
 - init default camera 
 */ 
+	matlevel = -1;
+
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			Xsp[i][j] = 0;
+		}
+	}
+	Xsp[0][0] = xres / 2.0;
+	Xsp[0][3] = xres / 2.0;
+	Xsp[1][1] = -1.0 * yres / 2.0;
+	Xsp[1][3] = yres / 2.0;
+	Xsp[2][2] = MAXINT;
+	Xsp[3][3] = 1.0;
+
+	m_camera.position[0] = DEFAULT_IM_X;
+	m_camera.position[1] = DEFAULT_IM_Y;
+	m_camera.position[2] = DEFAULT_IM_Z;
+	for (int i = 0; i < 3; i++) {
+		m_camera.lookat[i] = 0;
+		m_camera.worldup[i] = 0;
+	}
+	m_camera.worldup[1] = 1.0;
+	m_camera.FOV = DEFAULT_FOV;
+
+
 }
 
 GzRender::~GzRender()
@@ -120,6 +145,61 @@ int GzRender::GzBeginRender()
 - init Ximage - put Xsp at base of stack, push on Xpi and Xiw 
 - now stack contains Xsw and app can push model Xforms when needed 
 */ 
+	// Compute Xiw:
+	GzCoord cl, newUp, the_X, the_Y, the_Z;
+	for (int i = 0; i < 3; i++) {
+		cl[i] = m_camera.lookat[i] - m_camera.position[i];
+	}
+	the_Z[0] = cl[0] / (float)sqrt((float)(cl[0] * cl[0] + cl[1] * cl[1] + cl[2] * cl[2]));
+	the_Z[1] = cl[1] / (float)sqrt((float)(cl[0] * cl[0] + cl[1] * cl[1] + cl[2] * cl[2]));
+	the_Z[2] = cl[2] / (float)sqrt((float)(cl[0] * cl[0] + cl[1] * cl[1] + cl[2] * cl[2]));
+
+	float upDotZ = m_camera.worldup[0] * the_Z[0] + m_camera.worldup[1] * the_Z[1] + m_camera.worldup[2] * the_Z[2];
+	newUp[0] = m_camera.worldup[0] - upDotZ * the_Z[0];
+	newUp[1] = m_camera.worldup[1] - upDotZ * the_Z[1];
+	newUp[2] = m_camera.worldup[2] - upDotZ * the_Z[2];
+	the_Y[0] = newUp[0] / (float)sqrt((float)(newUp[0] * newUp[0] + newUp[1] * newUp[1] + newUp[2] * newUp[2]));
+	the_Y[1] = newUp[1] / (float)sqrt((float)(newUp[0] * newUp[0] + newUp[1] * newUp[1] + newUp[2] * newUp[2]));
+	the_Y[2] = newUp[2] / (float)sqrt((float)(newUp[0] * newUp[0] + newUp[1] * newUp[1] + newUp[2] * newUp[2]));
+
+	the_X[0] = the_Y[1] * the_Z[2] - the_Y[2] * the_Z[1];
+	the_X[1] = the_Y[2] * the_Z[0] - the_Y[0] * the_Z[2];
+	the_X[2] = the_Y[0] * the_Z[1] - the_Y[1] * the_Z[0];
+
+	m_camera.Xiw[0][0] = the_X[0];
+	m_camera.Xiw[0][1] = the_X[1];
+	m_camera.Xiw[0][2] = the_X[2];
+	m_camera.Xiw[1][0] = the_Y[0];
+	m_camera.Xiw[1][1] = the_Y[1];
+	m_camera.Xiw[1][2] = the_Y[2];
+	m_camera.Xiw[2][0] = the_Z[0];
+	m_camera.Xiw[2][1] = the_Z[1];
+	m_camera.Xiw[2][2] = the_Z[2];
+	m_camera.Xiw[0][3] = -1.0 * (the_X[0] * m_camera.position[0] + the_X[1] * m_camera.position[1] + the_X[2] * m_camera.position[2]);
+	m_camera.Xiw[1][3] = -1.0 * (the_Y[0] * m_camera.position[0] + the_Y[1] * m_camera.position[1] + the_Y[2] * m_camera.position[2]);
+	m_camera.Xiw[2][3] = -1.0 * (the_Z[0] * m_camera.position[0] + the_Z[1] * m_camera.position[1] + the_Z[2] * m_camera.position[2]);
+	m_camera.Xiw[3][0] = 0;
+	m_camera.Xiw[3][1] = 0;
+	m_camera.Xiw[3][2] = 0;
+	m_camera.Xiw[3][3] = 1;
+	
+	// Compute Xpi:
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			m_camera.Xpi[i][j] = 0;
+		}
+	}
+	m_camera.Xpi[0][0] = 1;
+	m_camera.Xpi[1][1] = 1;
+	m_camera.Xpi[2][2] = (float)tan((double)(m_camera.FOV * PI / 180.0) / 2.0);
+	m_camera.Xpi[3][2] = (float)tan((double)(m_camera.FOV * PI / 180.0) / 2.0);
+	m_camera.Xpi[3][3] = 1;
+
+	// Push Xsp:
+	GzPushMatrix(Xsp);
+
+	GzPushMatrix(m_camera.Xpi);
+	GzPushMatrix(m_camera.Xiw);
 
 	return GZ_SUCCESS;
 }
@@ -129,7 +209,20 @@ int GzRender::GzPutCamera(GzCamera camera)
 /* HW 3.8 
 /*- overwrite renderer camera structure with new camera definition
 */
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			m_camera.Xiw[i][j] = camera.Xiw[i][j];
+			m_camera.Xpi[i][j] = camera.Xpi[i][j];
+		}
+	}
 
+	for (int i = 0; i < 3; i++) {
+		m_camera.position[i] = camera.position[i];
+		m_camera.lookat[i] = camera.lookat[i];
+		m_camera.worldup[i] = camera.worldup[i];
+	}
+	m_camera.FOV = camera.FOV;
+	
 	return GZ_SUCCESS;	
 }
 
@@ -139,7 +232,30 @@ int GzRender::GzPushMatrix(GzMatrix	matrix)
 - push a matrix onto the Ximage stack
 - check for stack overflow
 */
-	
+	if (matlevel < MATLEVELS - 1) {
+		if (matlevel == -1) {
+			for (int j = 0; j < 4; j++) {
+				for (int i = 0; i < 4; i++) {
+					Ximage[0][i][j] = matrix[i][j];
+				}
+			}
+		}
+		else {
+			// Matrix Multiplication:
+			for (int k = 0; k < 4; k++) {
+				for (int j = 0; j < 4; j++) {
+					float sum = 0;
+					for (int i = 0; i < 4; i++) {
+						sum += Ximage[matlevel][k][i] * matrix[i][j];
+					}
+					Ximage[matlevel+1][k][j] = sum;
+				}
+			}
+		}
+		// increment matlevel
+		matlevel++;
+	}
+
 	return GZ_SUCCESS;
 }
 
@@ -149,7 +265,9 @@ int GzRender::GzPopMatrix()
 - pop a matrix off the Ximage stack
 - check for stack underflow
 */
-
+	if (matlevel) {
+		matlevel--;
+	}
 	return GZ_SUCCESS;
 }
 
@@ -301,20 +419,34 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 	if (numParts == 1) {
 		GzCoord* verticesPointer = (GzCoord*)valueList[0];
 		GzCoord vertices[3], sortedVertices[3];
+		
+		// Construct 4D vector:
+		float vertices4D[3][4];
+		float transedVertices4D[3][4];
+		for (int j = 0; j < 3; j++) {
+			for (int i = 0; i < 3; i++) {
+				vertices4D[j][i] = verticesPointer[j][i];
+			}
+			vertices4D[j][3] = 1.0;
+		}
+		// Transformation M * Vertex Coord.
+		for (int k = 0; k < 3; k++) {
+			for (int j = 0; j < 4; j++) {
+				float sum = 0;
+				for (int i = 0; i < 4; i++) {
+					sum += Ximage[matlevel][j][i] * vertices4D[k][i];
+				}
+				transedVertices4D[k][j] = sum;
+			}
+		}
+		// 4D => 3D
+		for (int j = 0; j < 3; j++) {
+			for (int i = 0; i < 3; i++) {
+				vertices[j][i] = transedVertices4D[j][i] / transedVertices4D[j][3];
+			}
+		}
 
-		// V1:
-		vertices[0][0] = verticesPointer[0][0];
-		vertices[0][1] = verticesPointer[0][1];
-		vertices[0][2] = verticesPointer[0][2];
-		// V2:
-		vertices[1][0] = verticesPointer[1][0];
-		vertices[1][1] = verticesPointer[1][1];
-		vertices[1][2] = verticesPointer[1][2];
-		// V3:
-		vertices[2][0] = verticesPointer[2][0];
-		vertices[2][1] = verticesPointer[2][1];
-		vertices[2][2] = verticesPointer[2][2];
-
+		// Begin Rasterization:
 		if (vertices[0][1] > vertices[1][1]) {
 			float tempX, tempY, tempZ;
 			tempX = vertices[0][0];
