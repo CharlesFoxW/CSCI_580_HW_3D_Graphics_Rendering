@@ -167,6 +167,8 @@ GzRender::GzRender(int xRes, int yRes)
 	}
 	m_camera.worldup[1] = 1.0;
 	m_camera.FOV = DEFAULT_FOV;
+
+	numlights = 0;
 }
 
 GzRender::~GzRender()
@@ -189,6 +191,7 @@ int GzRender::GzDefault()
 		framebuffer[RGB_DIMEMSION * i + 2] = (char)2880;
 		//framebuffer[RGB_DIMEMSION * i + 3] = (char)MAXINT;	// initialize Z.
 	}
+
 	return GZ_SUCCESS;
 }
 
@@ -200,7 +203,7 @@ int GzRender::GzBeginRender()
 - init Ximage - put Xsp at base of stack, push on Xpi and Xiw 
 - now stack contains Xsw and app can push model Xforms when needed 
 */ 
-	// Compute Xiw:
+// Compute Xiw:
 	GzCoord cl, newUp, the_X, the_Y, the_Z;
 	for (int i = 0; i < 3; i++) {
 		cl[i] = m_camera.lookat[i] - m_camera.position[i];
@@ -237,7 +240,7 @@ int GzRender::GzBeginRender()
 	m_camera.Xiw[3][1] = 0;
 	m_camera.Xiw[3][2] = 0;
 	m_camera.Xiw[3][3] = 1;
-	
+
 	// Compute Xpi:
 	for (int j = 0; j < 4; j++) {
 		for (int i = 0; i < 4; i++) {
@@ -261,6 +264,7 @@ int GzRender::GzBeginRender()
 		return GZ_FAILURE;
 	else
 		return GZ_SUCCESS;
+
 }
 
 int GzRender::GzPutCamera(GzCamera camera)
@@ -281,7 +285,7 @@ int GzRender::GzPutCamera(GzCamera camera)
 		m_camera.worldup[i] = camera.worldup[i];
 	}
 	m_camera.FOV = camera.FOV;
-	
+
 	return GZ_SUCCESS;	
 }
 
@@ -331,6 +335,7 @@ int GzRender::GzPopMatrix()
 	}
 	else
 		return GZ_FAILURE;
+
 	return GZ_SUCCESS;
 }
 
@@ -459,6 +464,7 @@ int GzRender::GzPutAttribute(int numAttributes, GzToken	*nameList, GzPointer *va
 -- Set renderer attribute states (e.g.: GZ_RGB_COLOR default color)
 -- In later homeworks set shaders, interpolaters, texture maps, and lights
 */
+	/*
 	if (numAttributes == 1) {
 		GzToken token = nameList[0];
 		float* color = (float*)valueList[0];
@@ -466,6 +472,94 @@ int GzRender::GzPutAttribute(int numAttributes, GzToken	*nameList, GzPointer *va
 		flatcolor[1] = color[1];
 		flatcolor[2] = color[2];
 	}
+	*/
+	/*
+	int currentIndex = numAttributes;
+	//float* light = (float*)valueList[0];
+	valueList += sizeof(GzLight*) / sizeof(char*);
+	GzLight* light = (GzLight*) *valueList;
+	//GzColor c;
+	//c[0] = light->color[0];
+	flatcolor[0] = light->color[0];
+	flatcolor[1] = light->color[1];
+	flatcolor[2] = light->color[2];
+	
+	
+	char buffer[50];
+	sprintf_s(buffer, "Light Color: %4.2f, %4.2f, %4.2f, \n", flatcolor[0], flatcolor[1], flatcolor[2]);
+	OutputDebugStringA(buffer);
+	*/
+
+	int index = 0;
+	while (index < numAttributes) {
+		GzToken token = nameList[index];
+
+		switch (token) {
+		case GZ_RGB_COLOR: {
+			GzColor* colorRGB = (GzColor*)valueList[index];
+			flatcolor[0] = (*colorRGB)[0];
+			flatcolor[1] = (*colorRGB)[1];
+			flatcolor[2] = (*colorRGB)[2];
+		}
+		break;
+		case GZ_INTERPOLATE: {
+			int* mode = (int*)valueList[index];
+			interp_mode = *mode;
+		}
+		break;
+		case GZ_DIRECTIONAL_LIGHT: {
+			GzLight* lightDir = (GzLight*)valueList[index];
+			lights[numlights].direction[0] = lightDir->direction[0];
+			lights[numlights].direction[1] = lightDir->direction[1];
+			lights[numlights].direction[2] = lightDir->direction[2];
+			lights[numlights].color[0] = lightDir->color[0];
+			lights[numlights].color[1] = lightDir->color[1];
+			lights[numlights].color[2] = lightDir->color[2];
+			numlights++;
+		}
+		break;
+		case GZ_AMBIENT_LIGHT: {
+			GzLight* lightAmb = (GzLight*)valueList[index];
+			ambientlight.direction[0] = lightAmb->direction[0];
+			ambientlight.direction[1] = lightAmb->direction[1];
+			ambientlight.direction[2] = lightAmb->direction[2];
+			ambientlight.color[0] = lightAmb->color[0];
+			ambientlight.color[1] = lightAmb->color[1];
+			ambientlight.color[2] = lightAmb->color[2];
+		}
+		break;
+		case GZ_AMBIENT_COEFFICIENT: {
+			GzColor* colorAmb = (GzColor*)valueList[index];
+			Ka[0] = (*colorAmb)[0];
+			Ka[1] = (*colorAmb)[1];
+			Ka[2] = (*colorAmb)[2];
+		}
+		break;
+		case GZ_DIFFUSE_COEFFICIENT: {
+			GzColor* colorDiff = (GzColor*)valueList[index];
+			Kd[0] = (*colorDiff)[0];
+			Kd[1] = (*colorDiff)[1];
+			Kd[2] = (*colorDiff)[2];
+		}
+		break;
+		case GZ_SPECULAR_COEFFICIENT: {
+			GzColor* colorSpec = (GzColor*)valueList[index];
+			Ks[0] = (*colorSpec)[0];
+			Ks[1] = (*colorSpec)[1];
+			Ks[2] = (*colorSpec)[2];
+		}
+		break;
+		case GZ_DISTRIBUTION_COEFFICIENT: {
+			float* power = (float*)valueList[index];
+			spec = *power;
+		}
+		break;
+		default:
+		break;
+		}
+		index++;
+	}
+	
 	return GZ_SUCCESS;
 }
 
@@ -479,10 +573,14 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 -- Invoke the rastrizer/scanline framework
 -- Return error code
 */
-	if (numParts == 1) {
+	//if (numParts == 1) {
+
+
+
+
 		GzCoord* verticesPointer = (GzCoord*)valueList[0];
 		GzCoord vertices[3];
-		
+
 		// Construct 4D vector:
 		float vertices4D[3][4];
 		float transedVertices4D[3][4];
@@ -663,7 +761,7 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 				}
 			}
 		}
-	}
+	//}
 	return GZ_SUCCESS;
 }
 
