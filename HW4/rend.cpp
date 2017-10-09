@@ -15,6 +15,10 @@
 #define RGB_DIMEMSION	3	/* RGB -> 3D color */
 #define COLOR_LIMIT		4095	/* Clamping the color value into 0~4095. */
 
+static short matlevelNormal;	/* Global variable of the head of matrix stack of normals */
+int pushMatToStack(short &head, GzMatrix* matStack, GzMatrix mat);
+int popMatToStack(short &head, GzMatrix* matStack);
+
 int GzRender::GzRotXMat(float degree, GzMatrix mat)
 {
 /* HW 3.1
@@ -34,6 +38,8 @@ int GzRender::GzRotXMat(float degree, GzMatrix mat)
 	mat[2][2] = (float)cos((double)radianAngle);
 	mat[3][3] = 1.0;
 
+	if (pushMatToStack(matlevelNormal, Xnorm, mat))
+		return GZ_FAILURE;
 	return GZ_SUCCESS;
 }
 
@@ -56,6 +62,9 @@ int GzRender::GzRotYMat(float degree, GzMatrix mat)
 	mat[2][2] = (float)cos((double)radianAngle);
 	mat[3][3] = 1.0;
 
+	if (pushMatToStack(matlevelNormal, Xnorm, mat))
+		return GZ_FAILURE;
+
 	return GZ_SUCCESS;
 }
 
@@ -77,6 +86,9 @@ int GzRender::GzRotZMat(float degree, GzMatrix mat)
 	mat[1][1] = (float)cos((double)radianAngle);
 	mat[2][2] = 1.0;
 	mat[3][3] = 1.0;
+
+	if (pushMatToStack(matlevelNormal, Xnorm, mat))
+		return GZ_FAILURE;
 
 	return GZ_SUCCESS;
 }
@@ -145,6 +157,7 @@ GzRender::GzRender(int xRes, int yRes)
 - init default camera 
 */ 
 	matlevel = -1;
+	matlevelNormal = -1;
 
 	for (int j = 0; j < 4; j++) {
 		for (int i = 0; i < 4; i++) {
@@ -203,6 +216,19 @@ int GzRender::GzBeginRender()
 - init Ximage - put Xsp at base of stack, push on Xpi and Xiw 
 - now stack contains Xsw and app can push model Xforms when needed 
 */ 
+
+// Define I:
+	GzMatrix matrix_I;
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			matrix_I[j][i] = 0;
+		}
+	}
+	matrix_I[0][0] = 1;
+	matrix_I[1][1] = 1;
+	matrix_I[2][2] = 1;
+	matrix_I[3][3] = 1;
+
 // Compute Xiw:
 	GzCoord cl, newUp, the_X, the_Y, the_Z;
 	for (int i = 0; i < 3; i++) {
@@ -256,9 +282,23 @@ int GzRender::GzBeginRender()
 	// Push Xsp:
 	int status = 0;
 	status |= GzPushMatrix(Xsp);
-
 	status |= GzPushMatrix(m_camera.Xpi);
 	status |= GzPushMatrix(m_camera.Xiw);
+
+	status |= pushMatToStack(matlevelNormal, Xnorm, matrix_I);
+	status |= pushMatToStack(matlevelNormal, Xnorm, matrix_I);
+
+	GzMatrix XiwNormal;
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			XiwNormal[j][i] = m_camera.Xiw[j][i];
+		}
+	}
+	XiwNormal[0][3] = 0;
+	XiwNormal[1][3] = 0;
+	XiwNormal[2][3] = 0;
+
+	status |= pushMatToStack(matlevelNormal, Xnorm, XiwNormal);
 
 	if (status)
 		return GZ_FAILURE;
@@ -295,6 +335,7 @@ int GzRender::GzPushMatrix(GzMatrix	matrix)
 - push a matrix onto the Ximage stack
 - check for stack overflow
 */
+	/*
 	if (matlevel < MATLEVELS) {
 		if (matlevel == -1) {
 			for (int j = 0; j < 4; j++) {
@@ -322,6 +363,11 @@ int GzRender::GzPushMatrix(GzMatrix	matrix)
 		return GZ_FAILURE;
 
 	return GZ_SUCCESS;
+	*/
+	if (pushMatToStack(matlevel, Ximage, matrix))
+		return GZ_FAILURE;
+	return GZ_SUCCESS;
+
 }
 
 int GzRender::GzPopMatrix()
@@ -330,12 +376,9 @@ int GzRender::GzPopMatrix()
 - pop a matrix off the Ximage stack
 - check for stack underflow
 */
-	if (matlevel > -1) {
-		matlevel--;
-	}
-	else
+	
+	if(popMatToStack(matlevel, Ximage))
 		return GZ_FAILURE;
-
 	return GZ_SUCCESS;
 }
 
@@ -574,36 +617,38 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 -- Return error code
 */
 	//if (numParts == 1) {
-
-
-
-
 		GzCoord* verticesPointer = (GzCoord*)valueList[0];
-		GzCoord vertices[3];
+		GzCoord* normalsPointer = (GzCoord*)valueList[1];
+		GzCoord vertices[3], normals[3];
 
 		// Construct 4D vector:
-		float vertices4D[3][4];
-		float transedVertices4D[3][4];
+		float vertices4D[3][4], normals4D[3][4];
+		float transedVertices4D[3][4], transedNormals4D[3][4];
 		for (int j = 0; j < 3; j++) {
 			for (int i = 0; i < 3; i++) {
 				vertices4D[j][i] = verticesPointer[j][i];
+				normals4D[j][i] = normalsPointer[j][i];
 			}
-			vertices4D[j][3] = 1.0;
+			vertices4D[j][3] = 1.0f;
+			normals4D[j][3] = 1.0f;
 		}
 		// Transformation M * Vertex Coord.
 		for (int k = 0; k < 3; k++) {
 			for (int j = 0; j < 4; j++) {
-				float sum = 0;
+				float sumV = 0, sumN = 0;
 				for (int i = 0; i < 4; i++) {
-					sum += Ximage[matlevel][j][i] * vertices4D[k][i];
+					sumV += Ximage[matlevel][j][i] * vertices4D[k][i];
+					sumN += Xnorm[matlevelNormal][j][i] * normals4D[k][i];
 				}
-				transedVertices4D[k][j] = sum;
+				transedVertices4D[k][j] = sumV;
+				transedNormals4D[k][j] = sumN;
 			}
 		}
 		// 4D => 3D
 		for (int j = 0; j < 3; j++) {
 			for (int i = 0; i < 3; i++) {
 				vertices[j][i] = transedVertices4D[j][i] / transedVertices4D[j][3];
+				normals[j][i] = transedNormals4D[j][i] / transedNormals4D[j][3];
 			}
 		}
 
@@ -752,9 +797,11 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 					float interpolatedZ = -1.0f * (planeA * (float)i + planeB * (float)j + planeD) / planeC;
 					int currentZ = (int)(interpolatedZ + 0.5);
 					if (currentZ >= 0) {
-						GzIntensity redIntensity = ctoi(flatcolor[0]);
-						GzIntensity greenIntensity = ctoi(flatcolor[1]);
-						GzIntensity blueIntensity = ctoi(flatcolor[2]);
+						GzIntensity redIntensity, greenIntensity, blueIntensity;
+
+						redIntensity = ctoi(flatcolor[0]);
+						greenIntensity = ctoi(flatcolor[1]);
+						blueIntensity = ctoi(flatcolor[2]);
 						// Call GzPut to push the pixel to pixelbuffer.
 						GzPut(i, j, redIntensity, greenIntensity, blueIntensity, 1, currentZ);
 					}
@@ -765,3 +812,43 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 	return GZ_SUCCESS;
 }
 
+int pushMatToStack(short &head, GzMatrix* matStack, GzMatrix mat) {
+
+	if (head < MATLEVELS) {
+		if (head == -1) {
+			for (int j = 0; j < 4; j++) {
+				for (int i = 0; i < 4; i++) {
+					matStack[0][i][j] = mat[i][j];
+				}
+			}
+		}
+		else {
+			// Matrix Multiplication:
+			for (int k = 0; k < 4; k++) {
+				for (int j = 0; j < 4; j++) {
+					float sum = 0;
+					for (int i = 0; i < 4; i++) {
+						sum += matStack[head][k][i] * mat[i][j];
+					}
+					matStack[head + 1][k][j] = sum;
+				}
+			}
+		}
+		// increment head
+		head++;
+	}
+	else
+		return GZ_FAILURE;
+
+	return GZ_SUCCESS;
+}
+
+int popMatToStack(short &head, GzMatrix* matStack) {
+	if (head > -1) {
+		head--;
+	}
+	else
+		return GZ_FAILURE;
+
+	return GZ_SUCCESS;
+}
