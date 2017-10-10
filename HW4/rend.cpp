@@ -6,6 +6,8 @@
 #include	"Gz.h"
 #include	"rend.h"
 
+#include	<algorithm>
+
 #define PI (float) 3.14159265358979323846
 
 /***********************************************/
@@ -38,8 +40,8 @@ int GzRender::GzRotXMat(float degree, GzMatrix mat)
 	mat[2][2] = (float)cos((double)radianAngle);
 	mat[3][3] = 1.0;
 
-	if (pushMatToStack(matlevelNormal, Xnorm, mat))
-		return GZ_FAILURE;
+	//if (pushMatToStack(matlevelNormal, Xnorm, mat))
+	//	return GZ_FAILURE;
 	return GZ_SUCCESS;
 }
 
@@ -62,8 +64,8 @@ int GzRender::GzRotYMat(float degree, GzMatrix mat)
 	mat[2][2] = (float)cos((double)radianAngle);
 	mat[3][3] = 1.0;
 
-	if (pushMatToStack(matlevelNormal, Xnorm, mat))
-		return GZ_FAILURE;
+	//if (pushMatToStack(matlevelNormal, Xnorm, mat))
+	//	return GZ_FAILURE;
 
 	return GZ_SUCCESS;
 }
@@ -87,8 +89,8 @@ int GzRender::GzRotZMat(float degree, GzMatrix mat)
 	mat[2][2] = 1.0;
 	mat[3][3] = 1.0;
 
-	if (pushMatToStack(matlevelNormal, Xnorm, mat))
-		return GZ_FAILURE;
+	//if (pushMatToStack(matlevelNormal, Xnorm, mat))
+	//	return GZ_FAILURE;
 
 	return GZ_SUCCESS;
 }
@@ -156,6 +158,7 @@ GzRender::GzRender(int xRes, int yRes)
 - setup Xsp and anything only done once 
 - init default camera 
 */ 
+	numlights = 0;
 	matlevel = -1;
 	matlevelNormal = -1;
 
@@ -224,10 +227,10 @@ int GzRender::GzBeginRender()
 			matrix_I[j][i] = 0;
 		}
 	}
-	matrix_I[0][0] = 1;
-	matrix_I[1][1] = 1;
-	matrix_I[2][2] = 1;
-	matrix_I[3][3] = 1;
+	matrix_I[0][0] = 1.0f;
+	matrix_I[1][1] = 1.0f;
+	matrix_I[2][2] = 1.0f;
+	matrix_I[3][3] = 1.0f;
 
 // Compute Xiw:
 	GzCoord cl, newUp, the_X, the_Y, the_Z;
@@ -285,20 +288,10 @@ int GzRender::GzBeginRender()
 	status |= GzPushMatrix(m_camera.Xpi);
 	status |= GzPushMatrix(m_camera.Xiw);
 
-	status |= pushMatToStack(matlevelNormal, Xnorm, matrix_I);
-	status |= pushMatToStack(matlevelNormal, Xnorm, matrix_I);
+	//status |= pushMatToStack(matlevelNormal, Xnorm, matrix_I);
+	//status |= pushMatToStack(matlevelNormal, Xnorm, matrix_I);
 
-	GzMatrix XiwNormal;
-	for (int j = 0; j < 4; j++) {
-		for (int i = 0; i < 4; i++) {
-			XiwNormal[j][i] = m_camera.Xiw[j][i];
-		}
-	}
-	XiwNormal[0][3] = 0;
-	XiwNormal[1][3] = 0;
-	XiwNormal[2][3] = 0;
-
-	status |= pushMatToStack(matlevelNormal, Xnorm, XiwNormal);
+	//status |= pushMatToStack(matlevelNormal, Xnorm, XiwNormal);
 
 	if (status)
 		return GZ_FAILURE;
@@ -364,7 +357,48 @@ int GzRender::GzPushMatrix(GzMatrix	matrix)
 
 	return GZ_SUCCESS;
 	*/
-	if (pushMatToStack(matlevel, Ximage, matrix))
+	int status = 0;
+	status |= pushMatToStack(matlevel, Ximage, matrix);
+
+	GzMatrix matrix_I;
+	for (int j = 0; j < 4; j++) {
+		for (int i = 0; i < 4; i++) {
+			matrix_I[j][i] = 0;
+		}
+	}
+	matrix_I[0][0] = 1.0f;
+	matrix_I[1][1] = 1.0f;
+	matrix_I[2][2] = 1.0f;
+	matrix_I[3][3] = 1.0f;
+
+	// For Xnorm: Normal Stack:
+	if (matlevelNormal < 2) {	// Xsp and Xpi, Push I
+		status |= pushMatToStack(matlevelNormal, Xnorm, matrix_I);
+	}
+	else if (matlevelNormal == 2) {	// Xiw.
+		GzMatrix Xnorm_iw;
+		for (int j = 0; j < 4; j++) {
+			for (int i = 0; i < 4; i++) {
+				Xnorm_iw[j][i] = m_camera.Xiw[j][i];
+			}
+		}
+		Xnorm_iw[0][3] = 0;
+		Xnorm_iw[1][3] = 0;
+		Xnorm_iw[2][3] = 0;
+
+		status |= pushMatToStack(matlevelNormal, Xnorm, Xnorm_iw);
+	}
+	else {	// Only Allow Rotation Matrices.
+		if (matrix[0][1] == 0 && matrix[0][2] == 0 && matrix[1][0] == 0 
+			&& matrix[1][2] == 0 && matrix[2][0] == 0 && matrix[2][1] == 0) {
+			status |= pushMatToStack(matlevelNormal, Xnorm, matrix_I);
+		}
+		else {
+			status |= pushMatToStack(matlevelNormal, Xnorm, matrix);
+		}
+	}
+
+	if (status)
 		return GZ_FAILURE;
 	return GZ_SUCCESS;
 
@@ -632,6 +666,11 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 			vertices4D[j][3] = 1.0f;
 			normals4D[j][3] = 1.0f;
 		}
+		/*
+		char buffer[50];
+		sprintf_s(buffer, "N: %4.2f, %4.2f, %4.2f, \n", normals4D[0][0], normals4D[0][1], normals4D[0][2]);
+		OutputDebugStringA(buffer);
+		*/
 		// Transformation M * Vertex Coord.
 		for (int k = 0; k < 3; k++) {
 			for (int j = 0; j < 4; j++) {
@@ -644,6 +683,7 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 				transedNormals4D[k][j] = sumN;
 			}
 		}
+		
 		// 4D => 3D
 		for (int j = 0; j < 3; j++) {
 			for (int i = 0; i < 3; i++) {
@@ -651,72 +691,57 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 				normals[j][i] = transedNormals4D[j][i] / transedNormals4D[j][3];
 			}
 		}
-
+		
+		
+		
+		
+		/*
+		float tempX, tempY, tempZ;
+		tempX = vertices[0][0];
+		tempY = vertices[0][1];
+		tempZ = vertices[0][2];
+		vertices[0][0] = vertices[1][0];
+		vertices[0][1] = vertices[1][1];
+		vertices[0][2] = vertices[1][2];
+		vertices[1][0] = tempX;
+		vertices[1][1] = tempY;
+		vertices[1][2] = tempZ;
+		*/
 		// Begin Rasterization:
 		if (vertices[0][1] > vertices[1][1]) {
-			float tempX, tempY, tempZ;
-			tempX = vertices[0][0];
-			tempY = vertices[0][1];
-			tempZ = vertices[0][2];
-			vertices[0][0] = vertices[1][0];
-			vertices[0][1] = vertices[1][1];
-			vertices[0][2] = vertices[1][2];
-			vertices[1][0] = tempX;
-			vertices[1][1] = tempY;
-			vertices[1][2] = tempZ;
+			for (int i = 0; i < 3; i++) {
+				std::swap(vertices[0][i], vertices[1][i]);
+				std::swap(normals[0][i], normals[1][i]);
+			}
 		}
 		if (vertices[0][1] > vertices[2][1]) {
-			float tempX, tempY, tempZ;
-			tempX = vertices[0][0];
-			tempY = vertices[0][1];
-			tempZ = vertices[0][2];
-			vertices[0][0] = vertices[2][0];
-			vertices[0][1] = vertices[2][1];
-			vertices[0][2] = vertices[2][2];
-			vertices[2][0] = tempX;
-			vertices[2][1] = tempY;
-			vertices[2][2] = tempZ;
+			for (int i = 0; i < 3; i++) {
+				std::swap(vertices[0][i], vertices[2][i]);
+				std::swap(normals[0][i], normals[2][i]);
+			}
 		}
 		if (vertices[1][1] > vertices[2][1]) {
-			float tempX, tempY, tempZ;
-			tempX = vertices[1][0];
-			tempY = vertices[1][1];
-			tempZ = vertices[1][2];
-			vertices[1][0] = vertices[2][0];
-			vertices[1][1] = vertices[2][1];
-			vertices[1][2] = vertices[2][2];
-			vertices[2][0] = tempX;
-			vertices[2][1] = tempY;
-			vertices[2][2] = tempZ;
+			for (int i = 0; i < 3; i++) {
+				std::swap(vertices[1][i], vertices[2][i]);
+				std::swap(normals[1][i], normals[2][i]);
+			}
 		}
 
 		//sorted by Y. determine final order by middle-Y & special cases.
 		if ((int)(vertices[0][1] + 0.5) == (int)(vertices[1][1] + 0.5)) {
 			if (vertices[0][0] > vertices[1][0]) {
-				float tempX, tempY, tempZ;
-				tempX = vertices[1][0];
-				tempY = vertices[1][1];
-				tempZ = vertices[1][2];
-				vertices[1][0] = vertices[2][0];
-				vertices[1][1] = vertices[2][1];
-				vertices[1][2] = vertices[2][2];
-				vertices[2][0] = tempX;
-				vertices[2][1] = tempY;
-				vertices[2][2] = tempZ;
+				for (int i = 0; i < 3; i++) {
+					std::swap(vertices[1][i], vertices[2][i]);
+					std::swap(normals[1][i], normals[2][i]);
+				}
 			}
 		}
 		else if ((int)(vertices[1][1] + 0.5) == (int)(vertices[2][1] + 0.5)) {
 			if (vertices[2][0] > vertices[1][0]) {
-				float tempX, tempY, tempZ;
-				tempX = vertices[1][0];
-				tempY = vertices[1][1];
-				tempZ = vertices[1][2];
-				vertices[1][0] = vertices[2][0];
-				vertices[1][1] = vertices[2][1];
-				vertices[1][2] = vertices[2][2];
-				vertices[2][0] = tempX;
-				vertices[2][1] = tempY;
-				vertices[2][2] = tempZ;
+				for (int i = 0; i < 3; i++) {
+					std::swap(vertices[1][i], vertices[2][i]);
+					std::swap(normals[1][i], normals[2][i]);
+				}
 			}
 		}
 		else {
@@ -730,16 +755,10 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 			}
 
 			if (middleX > vertices[1][0]) {
-				float tempX, tempY, tempZ;
-				tempX = vertices[1][0];
-				tempY = vertices[1][1];
-				tempZ = vertices[1][2];
-				vertices[1][0] = vertices[2][0];
-				vertices[1][1] = vertices[2][1];
-				vertices[1][2] = vertices[2][2];
-				vertices[2][0] = tempX;
-				vertices[2][1] = tempY;
-				vertices[2][2] = tempZ;
+				for (int i = 0; i < 3; i++) {
+					std::swap(vertices[1][i], vertices[2][i]);
+					std::swap(normals[1][i], normals[2][i]);
+				}
 			}
 		}
 		//sorted as CW. 3 edges: 1-2, 2-3, 3-1.
@@ -774,6 +793,161 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 		float planeC = (X1 * Y2) - (Y1 * X2);
 		float planeD = -1.0f * (planeA * vertices[0][0] + planeB * vertices[0][1] + planeC * vertices[0][2]);
 
+		// Lighting of 3 Vertices:
+		GzColor specIntensity[3], diffIntensity[3], ambIntensity[3], finalIntensity[3];
+		for (int j = 0; j < 3; j++) {
+			for (int i = 0; i < 3; i++) {
+				specIntensity[j][i] = 0;
+				diffIntensity[j][i] = 0;
+				ambIntensity[j][i] = 0;
+				finalIntensity[j][i] = 0;
+			}
+		}
+
+		for (int j = 0; j < 3; j++) {
+			for (int i = 0; i < numlights; i++) {
+				GzCoord R, E;
+				
+				E[0] = 0;
+				E[1] = 0;
+				E[2] = -1.0f;
+				
+				float nDotL = normals[j][0] * (lights[i]).direction[0]
+					+ normals[j][1] * (lights[i]).direction[1]
+					+ normals[j][2] * (lights[i]).direction[2];
+				float nDotE = normals[j][0] * E[0] + normals[j][1] * E[1] + normals[j][2] * E[2];
+				
+				if (nDotL * nDotE > 0) {
+					for (int k = 0; k < 3; k++) {
+						R[k] = 2.0f * nDotL * normals[j][k] - (lights[i]).direction[k];
+					}
+					float lengthR = (float)sqrt((double)(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]));
+					for (int k = 0; k < 3; k++) {
+						R[k] /= lengthR;
+					}
+
+					for (int k = 0; k < 3; k++) {
+						float rDotE = R[0] * E[0] + R[1] * E[1] + R[2] * E[2];
+						if (rDotE < 0) {
+							rDotE = 0;
+						}
+						if (rDotE > 1.0f) {
+							rDotE = 1.0f;
+						}
+
+						specIntensity[j][k] += Ks[k] *
+							(float)pow((double)(rDotE), (double)spec)
+							* (lights[i]).color[k];
+						if (nDotL > 0 && nDotE > 0) {
+							diffIntensity[j][k] += Kd[k] *
+								(normals[j][0] * (lights[i]).direction[0]
+									+ normals[j][1] * (lights[i]).direction[1]
+									+ normals[j][2] * (lights[i]).direction[2]) * (lights[i]).color[k];
+						}
+						else {
+							diffIntensity[j][k] += Kd[k] *
+								(-1.0f * normals[j][0] * (lights[i]).direction[0]
+									- 1.0f * normals[j][1] * (lights[i]).direction[1]
+									- 1.0f * normals[j][2] * (lights[i]).direction[2]) * (lights[i]).color[k];
+						}
+					}
+				}
+			}
+
+			for (int k = 0; k < 3; k++) {
+				ambIntensity[j][k] += Ka[k] * ambientlight.color[k];
+			}
+
+		}
+		for (int j = 0; j < 3; j++) {
+			for (int i = 0; i < 3; i++) {
+				finalIntensity[j][i] = specIntensity[j][i] + diffIntensity[j][i] + ambIntensity[j][i];
+				if (finalIntensity[j][i] > 1.0) {
+					finalIntensity[j][i] = 1.0;
+				}
+				if (finalIntensity[j][i] < 0) {
+					finalIntensity[j][i] = 0;
+				}
+			}
+		}
+		
+		//char buffer[50];
+		//sprintf_s(buffer, "Light Color: %4.2f, %4.2f, %4.2f, \n", finalIntensity[0][0], finalIntensity[0][1], finalIntensity[0][2]);
+		//OutputDebugStringA(buffer);
+		
+		// Interpolate Red:
+		float redX1 = vertices[1][0] - vertices[0][0];
+		float redY1 = vertices[1][1] - vertices[0][1];
+		float redZ1 = finalIntensity[1][0] - finalIntensity[0][0];
+		float redX2 = vertices[2][0] - vertices[0][0];
+		float redY2 = vertices[2][1] - vertices[0][1];
+		float redZ2 = finalIntensity[2][0] - finalIntensity[0][0];
+		float redPlaneA = (redY1 * redZ2) - (redZ1 * redY2);
+		float redPlaneB = -((redX1 * redZ2) - (redZ1 * redX2));
+		float redPlaneC = (redX1 * redY2) - (redY1 * redX2);
+		float redPlaneD = -1.0f * (redPlaneA * vertices[0][0] + redPlaneB * vertices[0][1] + redPlaneC * finalIntensity[0][0]);
+
+		// Interpolate Green:
+		float greenX1 = vertices[1][0] - vertices[0][0];
+		float greenY1 = vertices[1][1] - vertices[0][1];
+		float greenZ1 = finalIntensity[1][1] - finalIntensity[0][1];
+		float greenX2 = vertices[2][0] - vertices[0][0];
+		float greenY2 = vertices[2][1] - vertices[0][1];
+		float greenZ2 = finalIntensity[2][1] - finalIntensity[0][1];
+		float greenPlaneA = (greenY1 * greenZ2) - (greenZ1 * greenY2);
+		float greenPlaneB = -((greenX1 * greenZ2) - (greenZ1 * greenX2));
+		float greenPlaneC = (greenX1 * greenY2) - (greenY1 * greenX2);
+		float greenPlaneD = -1.0f * (greenPlaneA * vertices[0][0] + greenPlaneB * vertices[0][1] + greenPlaneC * finalIntensity[0][1]);
+
+		// Interpolate Blue:
+		float blueX1 = vertices[1][0] - vertices[0][0];
+		float blueY1 = vertices[1][1] - vertices[0][1];
+		float blueZ1 = finalIntensity[1][2] - finalIntensity[0][2];
+		float blueX2 = vertices[2][0] - vertices[0][0];
+		float blueY2 = vertices[2][1] - vertices[0][1];
+		float blueZ2 = finalIntensity[2][2] - finalIntensity[0][2];
+		float bluePlaneA = (blueY1 * blueZ2) - (blueZ1 * blueY2);
+		float bluePlaneB = -((blueX1 * blueZ2) - (blueZ1 * blueX2));
+		float bluePlaneC = (blueX1 * blueY2) - (blueY1 * blueX2);
+		float bluePlaneD = -1.0f * (bluePlaneA * vertices[0][0] + bluePlaneB * vertices[0][1] + bluePlaneC * finalIntensity[0][2]);
+
+		// Interpolate normalX:
+		float normalX_X1 = vertices[1][0] - vertices[0][0];
+		float normalX_Y1 = vertices[1][1] - vertices[0][1];
+		float normalX_Z1 = normals[1][0] - normals[0][0];
+		float normalX_X2 = vertices[2][0] - vertices[0][0];
+		float normalX_Y2 = vertices[2][1] - vertices[0][1];
+		float normalX_Z2 = normals[2][0] - normals[0][0];
+		float normalX_PlaneA = (normalX_Y1 * normalX_Z2) - (normalX_Z1 * normalX_Y2);
+		float normalX_PlaneB = -((normalX_X1 * normalX_Z2) - (normalX_Z1 * normalX_X2));
+		float normalX_PlaneC = (normalX_X1 * normalX_Y2) - (normalX_Y1 * normalX_X2);
+		float normalX_PlaneD = -1.0f * (normalX_PlaneA * vertices[0][0] + normalX_PlaneB * vertices[0][1] + normalX_PlaneC * normals[0][0]);
+
+		// Interpolate normalY:
+		float normalY_X1 = vertices[1][0] - vertices[0][0];
+		float normalY_Y1 = vertices[1][1] - vertices[0][1];
+		float normalY_Z1 = normals[1][1] - normals[0][1];
+		float normalY_X2 = vertices[2][0] - vertices[0][0];
+		float normalY_Y2 = vertices[2][1] - vertices[0][1];
+		float normalY_Z2 = normals[2][1] - normals[0][1];
+		float normalY_PlaneA = (normalY_Y1 * normalY_Z2) - (normalY_Z1 * normalY_Y2);
+		float normalY_PlaneB = -((normalY_X1 * normalY_Z2) - (normalY_Z1 * normalY_X2));
+		float normalY_PlaneC = (normalY_X1 * normalY_Y2) - (normalY_Y1 * normalY_X2);
+		float normalY_PlaneD = -1.0f * (normalY_PlaneA * vertices[0][0] + normalY_PlaneB * vertices[0][1] + normalY_PlaneC * normals[0][1]);
+
+		// Interpolate normalZ:
+		float normalZ_X1 = vertices[1][0] - vertices[0][0];
+		float normalZ_Y1 = vertices[1][1] - vertices[0][1];
+		float normalZ_Z1 = normals[1][2] - normals[0][2];
+		float normalZ_X2 = vertices[2][0] - vertices[0][0];
+		float normalZ_Y2 = vertices[2][1] - vertices[0][1];
+		float normalZ_Z2 = normals[2][2] - normals[0][2];
+		float normalZ_PlaneA = (normalZ_Y1 * normalZ_Z2) - (normalZ_Z1 * normalZ_Y2);
+		float normalZ_PlaneB = -((normalZ_X1 * normalZ_Z2) - (normalZ_Z1 * normalZ_X2));
+		float normalZ_PlaneC = (normalZ_X1 * normalZ_Y2) - (normalZ_Y1 * normalZ_X2);
+		float normalZ_PlaneD = -1.0f * (normalZ_PlaneA * vertices[0][0] + normalZ_PlaneB * vertices[0][1] + normalZ_PlaneC * normals[0][2]);
+
+
 		// Get Bounding Box:
 		float minX = min(min(vertices[0][0], vertices[1][0]), vertices[2][0]);
 		float maxX = max(max(vertices[0][0], vertices[1][0]), vertices[2][0]);
@@ -793,15 +967,118 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 
 				if ((LEE12 > 0 && LEE23 > 0 && LEE31 > 0 && planeC != 0)
 					|| (LEE12 < 0 && LEE23 < 0 && LEE31 < 0 && planeC != 0)
-					|| LEE12 == 0 || LEE23 == 0 || LEE31 == 0) { // Any pixel inside or on the 3 edges.
+					|| LEE12 == 0 || LEE23 == 0 || LEE31 == 0
+					&& redPlaneC * greenPlaneC * bluePlaneC != 0
+					&& normalX_PlaneC * normalY_PlaneC * normalZ_PlaneC != 0) { // Any pixel inside or on the 3 edges.
 					float interpolatedZ = -1.0f * (planeA * (float)i + planeB * (float)j + planeD) / planeC;
 					int currentZ = (int)(interpolatedZ + 0.5);
 					if (currentZ >= 0) {
-						GzIntensity redIntensity, greenIntensity, blueIntensity;
+						// Color Calculation:
+						GzIntensity redIntensity = 0, greenIntensity = 0, blueIntensity = 0;
+						if (interp_mode == GZ_FLAT) {	// Flat Shading
+							redIntensity = ctoi(flatcolor[0]);
+							greenIntensity = ctoi(flatcolor[1]);
+							blueIntensity = ctoi(flatcolor[2]);
+						}
+						else if (interp_mode == GZ_COLOR) {	//Gauroud Shading
+							GzColor intensity;
+							intensity[0] = -1.0f * (redPlaneA * (float)i + redPlaneB * (float)j + redPlaneD) / redPlaneC;
+							intensity[1] = -1.0f * (greenPlaneA * (float)i + greenPlaneB * (float)j + greenPlaneD) / greenPlaneC;
+							intensity[2] = -1.0f * (bluePlaneA * (float)i + bluePlaneB * (float)j + bluePlaneD) / bluePlaneC;
+							
+							redIntensity = ctoi(intensity[0]);
+							greenIntensity = ctoi(intensity[1]);
+							blueIntensity = ctoi(intensity[2]);
+							//char buffer[50];
+							//sprintf_s(buffer, "Light Color: %4.2f, %4.2f, %4.2f, \n", intensity[0], intensity[1], intensity[2]);
+							//OutputDebugStringA(buffer);
+							//printf("");
+						}
+						else if (interp_mode == GZ_NORMALS) {	// Phong Shading
+							GzColor intensity;
+							GzCoord interpolatedNormal;
+							interpolatedNormal[0] = -1.0f * (normalX_PlaneA * (float)i + normalX_PlaneB * (float)j + normalX_PlaneD) / normalX_PlaneC;
+							interpolatedNormal[1] = -1.0f * (normalY_PlaneA * (float)i + normalY_PlaneB * (float)j + normalY_PlaneD) / normalY_PlaneC;
+							interpolatedNormal[2] = -1.0f * (normalZ_PlaneA * (float)i + normalZ_PlaneB * (float)j + normalZ_PlaneD) / normalZ_PlaneC;
 
-						redIntensity = ctoi(flatcolor[0]);
-						greenIntensity = ctoi(flatcolor[1]);
-						blueIntensity = ctoi(flatcolor[2]);
+							GzColor specI, diffI, ambI;
+							for (int m = 0; m < 3; m++) {
+								specI[m] = 0;
+								diffI[m] = 0;
+								ambI[m] = 0;
+							}
+
+							for (int m = 0; m < numlights; m++) {
+								GzCoord R, E;
+
+								E[0] = 0;
+								E[1] = 0;
+								E[2] = -1.0f;
+
+								float nDotL = interpolatedNormal[0] * (lights[m]).direction[0]
+									+ interpolatedNormal[1] * (lights[m]).direction[1]
+									+ interpolatedNormal[2] * (lights[m]).direction[2];
+								float nDotE = interpolatedNormal[0] * E[0] + interpolatedNormal[1] * E[1] + interpolatedNormal[2] * E[2];
+
+								if (nDotL * nDotE > 0) {
+									for (int k = 0; k < 3; k++) {
+										R[k] = 2.0f * nDotL * interpolatedNormal[k] - (lights[m]).direction[k];
+									}
+									float lengthR = (float)sqrt((double)(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]));
+									for (int k = 0; k < 3; k++) {
+										R[k] /= lengthR;
+									}
+
+									for (int k = 0; k < 3; k++) {
+										float rDotE = R[0] * E[0] + R[1] * E[1] + R[2] * E[2];
+										if (rDotE < 0) {
+											rDotE = 0;
+										}
+										if (rDotE > 1.0f) {
+											rDotE = 1.0f;
+										}
+
+										specI[k] += Ks[k] *
+											(float)pow((double)(rDotE), (double)spec)
+											* (lights[i]).color[k];
+										if (nDotL > 0 && nDotE > 0) {
+											diffI[k] += Kd[k] *
+												(interpolatedNormal[0] * (lights[m]).direction[0]
+													+ interpolatedNormal[1] * (lights[m]).direction[1]
+													+ interpolatedNormal[2] * (lights[m]).direction[2]) * (lights[m]).color[k];
+										}
+										else {
+											diffI[k] += Kd[k] *
+												(-1.0f * interpolatedNormal[0] * (lights[m]).direction[0]
+													- 1.0f * interpolatedNormal[1] * (lights[m]).direction[1]
+													- 1.0f * interpolatedNormal[2] * (lights[m]).direction[2]) * (lights[m]).color[k];
+										}
+									}
+								}
+							}
+
+							for (int m = 0; m < 3; m++) {
+								ambI[m] += Ka[m] * ambientlight.color[m];
+							}
+
+							
+							for (int m = 0; m < 3; m++) {
+								intensity[m] = specI[m] + diffI[m] + ambI[m];
+								if (intensity[m] > 1.0) {
+									intensity[m] = 1.0;
+								}
+								if (intensity[m] < 0) {
+									intensity[m] = 0;
+								}
+							}
+
+							redIntensity = ctoi(intensity[0]);
+							greenIntensity = ctoi(intensity[1]);
+							blueIntensity = ctoi(intensity[2]);
+
+
+						}
+
 						// Call GzPut to push the pixel to pixelbuffer.
 						GzPut(i, j, redIntensity, greenIntensity, blueIntensity, 1, currentZ);
 					}
