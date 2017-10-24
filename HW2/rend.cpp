@@ -216,69 +216,34 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 		vertices[2][2] = verticesPointer[2][2];
 		
 		if (vertices[0][1] > vertices[1][1]) {
-			float tempX, tempY, tempZ;
-			tempX = vertices[0][0];
-			tempY = vertices[0][1];
-			tempZ = vertices[0][2];
-			vertices[0][0] = vertices[1][0];
-			vertices[0][1] = vertices[1][1];
-			vertices[0][2] = vertices[1][2];
-			vertices[1][0] = tempX;
-			vertices[1][1] = tempY;
-			vertices[1][2] = tempZ;
+			for (int i = 0; i < 3; i++) {
+				std::swap(vertices[0][i], vertices[1][i]);
+			}
 		}
 		if (vertices[0][1] > vertices[2][1]) {
-			float tempX, tempY, tempZ;
-			tempX = vertices[0][0];
-			tempY = vertices[0][1];
-			tempZ = vertices[0][2];
-			vertices[0][0] = vertices[2][0];
-			vertices[0][1] = vertices[2][1];
-			vertices[0][2] = vertices[2][2];
-			vertices[2][0] = tempX;
-			vertices[2][1] = tempY;
-			vertices[2][2] = tempZ;
+			for (int i = 0; i < 3; i++) {
+				std::swap(vertices[0][i], vertices[2][i]);
+			}
 		}
 		if (vertices[1][1] > vertices[2][1]) {
-			float tempX, tempY, tempZ;
-			tempX = vertices[1][0];
-			tempY = vertices[1][1];
-			tempZ = vertices[1][2];
-			vertices[1][0] = vertices[2][0];
-			vertices[1][1] = vertices[2][1];
-			vertices[1][2] = vertices[2][2];
-			vertices[2][0] = tempX;
-			vertices[2][1] = tempY;
-			vertices[2][2] = tempZ;
+			for (int i = 0; i < 3; i++) {
+				std::swap(vertices[1][i], vertices[2][i]);
+			}
 		}
 
 		//sorted by Y. determine final order by middle-Y & special cases.
 		if ((int)(vertices[0][1] + 0.5) == (int) (vertices[1][1] + 0.5)) {
 			if (vertices[0][0] > vertices[1][0]) {
-				float tempX, tempY, tempZ;
-				tempX = vertices[1][0];
-				tempY = vertices[1][1];
-				tempZ = vertices[1][2];
-				vertices[1][0] = vertices[2][0];
-				vertices[1][1] = vertices[2][1];
-				vertices[1][2] = vertices[2][2];
-				vertices[2][0] = tempX;
-				vertices[2][1] = tempY;
-				vertices[2][2] = tempZ;
+				for (int i = 0; i < 3; i++) {
+					std::swap(vertices[1][i], vertices[2][i]);
+				}
 			}
 		}
 		else if ((int) (vertices[1][1] + 0.5) == (int) (vertices[2][1] + 0.5)) {
 			if (vertices[2][0] > vertices[1][0]) {
-				float tempX, tempY, tempZ;
-				tempX = vertices[1][0];
-				tempY = vertices[1][1];
-				tempZ = vertices[1][2];
-				vertices[1][0] = vertices[2][0];
-				vertices[1][1] = vertices[2][1];
-				vertices[1][2] = vertices[2][2];
-				vertices[2][0] = tempX;
-				vertices[2][1] = tempY;
-				vertices[2][2] = tempZ;
+				for (int i = 0; i < 3; i++) {
+					std::swap(vertices[1][i], vertices[2][i]);
+				}
 			}
 		}
 		else {
@@ -292,16 +257,9 @@ int GzRender::GzPutTriangle(int	numParts, GzToken *nameList, GzPointer *valueLis
 			}
 
 			if (middleX > vertices[1][0]) {
-				float tempX, tempY, tempZ;
-				tempX = vertices[1][0];
-				tempY = vertices[1][1];
-				tempZ = vertices[1][2];
-				vertices[1][0] = vertices[2][0];
-				vertices[1][1] = vertices[2][1];
-				vertices[1][2] = vertices[2][2];
-				vertices[2][0] = tempX;
-				vertices[2][1] = tempY;
-				vertices[2][2] = tempZ;
+				for (int i = 0; i < 3; i++) {
+					std::swap(vertices[1][i], vertices[2][i]);
+				}
 			}
 		}
 		//sorted as CW. 3 edges: 1-2, 2-3, 3-1.
