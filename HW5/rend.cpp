@@ -574,7 +574,9 @@ int GzRender::GzPutAttribute(int numAttributes, GzToken	*nameList, GzPointer *va
 		}
 		break;
 		case GZ_TEXTURE_MAP: {
-
+			GzTexture textureFunc = (GzTexture)valueList[index];
+			if (textureFunc != NULL)
+				tex_fun = textureFunc;
 		}
 		default:
 			break;
@@ -603,7 +605,15 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 
 	GzCoord* verticesPointer = (GzCoord*)valueList[0];
 	GzCoord* normalsPointer = (GzCoord*)valueList[1];
+	GzTextureIndex* uvListPointer = (GzTextureIndex*)valueList[2];
 	GzCoord vertices[3], normals[3];
+	GzTextureIndex uvList[3];
+	
+	/*
+	char buffer[50];
+	sprintf(buffer, "uv = %4.4f, %4.4f", uvListPointer[0][0], uvListPointer[0][1]);
+	OutputDebugStringA(buffer);
+	*/
 
 	// Construct 4D vector:
 	float vertices4D[3][4], normals4D[3][4];
@@ -638,23 +648,36 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 		}
 	}
 
+	// Assign UV List:
+	for (int j = 0; j < 3; j++) {
+		for (int i = 0; i < 2; i++) {
+			uvList[j][i] = uvListPointer[j][i];
+		}
+	}
+
 	// Begin Rasterization:
 	if (vertices[0][1] > vertices[1][1]) {
 		for (int i = 0; i < 3; i++) {
 			std::swap(vertices[0][i], vertices[1][i]);
 			std::swap(normals[0][i], normals[1][i]);
+			if (i < 2)
+				std::swap(uvList[0][i], uvList[1][i]);
 		}
 	}
 	if (vertices[0][1] > vertices[2][1]) {
 		for (int i = 0; i < 3; i++) {
 			std::swap(vertices[0][i], vertices[2][i]);
 			std::swap(normals[0][i], normals[2][i]);
+			if (i < 2)
+				std::swap(uvList[0][i], uvList[2][i]);
 		}
 	}
 	if (vertices[1][1] > vertices[2][1]) {
 		for (int i = 0; i < 3; i++) {
 			std::swap(vertices[1][i], vertices[2][i]);
 			std::swap(normals[1][i], normals[2][i]);
+			if (i < 2)
+				std::swap(uvList[1][i], uvList[2][i]);
 		}
 	}
 
@@ -664,6 +687,8 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 			for (int i = 0; i < 3; i++) {
 				std::swap(vertices[1][i], vertices[2][i]);
 				std::swap(normals[1][i], normals[2][i]);
+				if (i < 2)
+					std::swap(uvList[1][i], uvList[2][i]);
 			}
 		}
 	}
@@ -672,6 +697,8 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 			for (int i = 0; i < 3; i++) {
 				std::swap(vertices[1][i], vertices[2][i]);
 				std::swap(normals[1][i], normals[2][i]);
+				if (i < 2)
+					std::swap(uvList[1][i], uvList[2][i]);
 			}
 		}
 	}
@@ -689,6 +716,8 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 			for (int i = 0; i < 3; i++) {
 				std::swap(vertices[1][i], vertices[2][i]);
 				std::swap(normals[1][i], normals[2][i]);
+				if (i < 2)
+					std::swap(uvList[1][i], uvList[2][i]);
 			}
 		}
 	}
@@ -735,69 +764,96 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 		}
 	}
 
-	for (int j = 0; j < 3; j++) {
-		for (int i = 0; i < numlights; i++) {
-			GzCoord R, E;
+	// For texture color of Gouraud Shading:
+	/*
+	GzColor uvVertexColor[3] = {0};
+	if (interp_mode == GZ_COLOR && tex_fun != NULL) {
+		//GzTextureIndex currentUV;
+		
+		//currentUV[U] = -1.0f * (uPlaneA * (float)i + uPlaneB * (float)j + uPlaneD) / uPlaneC;
+		//currentUV[V] = -1.0f * (vPlaneA * (float)i + vPlaneB * (float)j + vPlaneD) / vPlaneC;
 
-			E[0] = 0;
-			E[1] = 0;
-			E[2] = -1.0f;
-
-			float nDotL = normals[j][0] * (lights[i]).direction[0]
-				+ normals[j][1] * (lights[i]).direction[1]
-				+ normals[j][2] * (lights[i]).direction[2];
-			float nDotE = normals[j][0] * E[0] + normals[j][1] * E[1] + normals[j][2] * E[2];
-
-			if (nDotL * nDotE > 0) {
-				for (int k = 0; k < 3; k++) {
-					R[k] = 2.0f * nDotL * normals[j][k] - (lights[i]).direction[k];
-				}
-				float lengthR = (float)sqrt((double)(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]));
-				for (int k = 0; k < 3; k++) {
-					R[k] /= lengthR;
-				}
-
-				for (int k = 0; k < 3; k++) {
-					float rDotE = R[0] * E[0] + R[1] * E[1] + R[2] * E[2];
-					if (rDotE < 0) {
-						rDotE = 0;
-					}
-					if (rDotE > 1.0f) {
-						rDotE = 1.0f;
-					}
-
-					specIntensity[j][k] += Ks[k] *
-						(float)pow((double)(rDotE), (double)spec)
-						* (lights[i]).color[k];
-					if (nDotL > 0 && nDotE > 0) {
-						diffIntensity[j][k] += Kd[k] *
-							(normals[j][0] * (lights[i]).direction[0]
-								+ normals[j][1] * (lights[i]).direction[1]
-								+ normals[j][2] * (lights[i]).direction[2]) * (lights[i]).color[k];
-					}
-					else {
-						diffIntensity[j][k] += Kd[k] *
-							(-1.0f * normals[j][0] * (lights[i]).direction[0]
-								- 1.0f * normals[j][1] * (lights[i]).direction[1]
-								- 1.0f * normals[j][2] * (lights[i]).direction[2]) * (lights[i]).color[k];
-					}
-				}
-			}
-		}
-
-		for (int k = 0; k < 3; k++) {
-			ambIntensity[j][k] += Ka[k] * ambientlight.color[k];
+		int status = tex_fun(uvList[0][U], uvList[0][V], uvVertexColor[0]);
+		status |= tex_fun(uvList[0][U], uvList[0][V], uvVertexColor[1]);
+		status |= tex_fun(uvList[0][U], uvList[0][V], uvVertexColor[2]);
+		if (status) {
+			return GZ_FAILURE;
 		}
 
 	}
-	for (int j = 0; j < 3; j++) {
-		for (int i = 0; i < 3; i++) {
-			finalIntensity[j][i] = specIntensity[j][i] + diffIntensity[j][i] + ambIntensity[j][i];
-			if (finalIntensity[j][i] > 1.0) {
-				finalIntensity[j][i] = 1.0;
+	*/
+	if (interp_mode == GZ_COLOR) {	// Gouraud Shading without texture
+		for (int j = 0; j < 3; j++) {	// j is vertex
+			for (int i = 0; i < numlights; i++) {	// i is light
+				GzCoord R, E;
+
+				E[0] = 0;
+				E[1] = 0;
+				E[2] = -1.0f;
+
+				float nDotL = normals[j][0] * (lights[i]).direction[0]
+					+ normals[j][1] * (lights[i]).direction[1]
+					+ normals[j][2] * (lights[i]).direction[2];
+				float nDotE = normals[j][0] * E[0] + normals[j][1] * E[1] + normals[j][2] * E[2];
+
+				if (nDotL * nDotE > 0) {
+					for (int k = 0; k < 3; k++) {
+						R[k] = 2.0f * nDotL * normals[j][k] - (lights[i]).direction[k];
+					}
+					float lengthR = (float)sqrt((double)(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]));
+					for (int k = 0; k < 3; k++) {
+						R[k] /= lengthR;
+					}
+
+					for (int k = 0; k < 3; k++) {	// k is color - R G B
+						float rDotE = R[0] * E[0] + R[1] * E[1] + R[2] * E[2];
+						if (rDotE < 0) {
+							rDotE = 0;
+						}
+						if (rDotE > 1.0f) {
+							rDotE = 1.0f;
+						}
+						
+						if (tex_fun != NULL) {
+							Ks[k] = 1.0f;
+							Kd[k] = 1.0f;
+							Ka[k] = 1.0f;
+						}
+						
+
+						specIntensity[j][k] += Ks[k] *
+							(float)pow((double)(rDotE), (double)spec)
+							* (lights[i]).color[k];
+						if (nDotL > 0 && nDotE > 0) {
+							diffIntensity[j][k] += Kd[k] *
+								(normals[j][0] * (lights[i]).direction[0]
+									+ normals[j][1] * (lights[i]).direction[1]
+									+ normals[j][2] * (lights[i]).direction[2]) * (lights[i]).color[k];
+						}
+						else {
+							diffIntensity[j][k] += Kd[k] *
+								(-1.0f * normals[j][0] * (lights[i]).direction[0]
+									- 1.0f * normals[j][1] * (lights[i]).direction[1]
+									- 1.0f * normals[j][2] * (lights[i]).direction[2]) * (lights[i]).color[k];
+						}
+					}
+				}
 			}
-			if (finalIntensity[j][i] < 0) {
-				finalIntensity[j][i] = 0;
+
+			for (int k = 0; k < 3; k++) {
+				ambIntensity[j][k] += Ka[k] * ambientlight.color[k];
+			}
+
+		}
+		for (int j = 0; j < 3; j++) {
+			for (int i = 0; i < 3; i++) {
+				finalIntensity[j][i] = specIntensity[j][i] + diffIntensity[j][i] + ambIntensity[j][i];
+				if (finalIntensity[j][i] > 1.0) {
+					finalIntensity[j][i] = 1.0;
+				}
+				if (finalIntensity[j][i] < 0) {
+					finalIntensity[j][i] = 0;
+				}
 			}
 		}
 	}
@@ -873,7 +929,55 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 	float normalZ_PlaneB = -((normalZ_X1 * normalZ_Z2) - (normalZ_Z1 * normalZ_X2));
 	float normalZ_PlaneC = (normalZ_X1 * normalZ_Y2) - (normalZ_Y1 * normalZ_X2);
 	float normalZ_PlaneD = -1.0f * (normalZ_PlaneA * vertices[0][0] + normalZ_PlaneB * vertices[0][1] + normalZ_PlaneC * normals[0][2]);
+	/*
+	GzColor vertTextColor[3] = {0};
+	if (tex_fun != NULL) {
 
+		int status = tex_fun(uvList[0][U], uvList[0][V], vertTextColor[0]);
+		status |= tex_fun(uvList[1][U], uvList[1][V], vertTextColor[1]);
+		status |= tex_fun(uvList[2][U], uvList[2][V], vertTextColor[2]);
+		if (status) {
+			return GZ_FAILURE;
+		}
+
+		//char buffer[50];
+		//sprintf(buffer, "tex_fun = %4.4f, %4.4f", vertTextColor[0][0], vertTextColor[0][1]);
+		//OutputDebugStringA(buffer);
+	}
+	*/
+
+	// Perspective Correction:
+	float vZPrime;
+	GzTextureIndex perspUVList[3];
+	for (int j = 0; j < 3; j++) {
+		vZPrime = vertices[j][2] / ((float)MAXINT - vertices[j][2]);
+		perspUVList[j][U] = uvList[j][U] / (vZPrime + 1.0f);
+		perspUVList[j][V] = uvList[j][V] / (vZPrime + 1.0f);
+	}
+
+	// Interpolate U, V:
+	float uX1 = vertices[1][0] - vertices[0][0];
+	float uY1 = vertices[1][1] - vertices[0][1];
+	float uZ1 = perspUVList[1][0] - perspUVList[0][0];
+	float uX2 = vertices[2][0] - vertices[0][0];
+	float uY2 = vertices[2][1] - vertices[0][1];
+	float uZ2 = perspUVList[2][0] - perspUVList[0][0];
+	float uPlaneA = (uY1 * uZ2) - (uZ1 * uY2);
+	float uPlaneB = -((uX1 * uZ2) - (uZ1 * uX2));
+	float uPlaneC = (uX1 * uY2) - (uY1 * uX2);
+	float uPlaneD = -1.0f * (uPlaneA * vertices[0][0] + uPlaneB * vertices[0][1] + uPlaneC * perspUVList[0][0]);
+
+	float vX1 = vertices[1][0] - vertices[0][0];
+	float vY1 = vertices[1][1] - vertices[0][1];
+	float vZ1 = perspUVList[1][1] - perspUVList[0][1];
+	float vX2 = vertices[2][0] - vertices[0][0];
+	float vY2 = vertices[2][1] - vertices[0][1];
+	float vZ2 = perspUVList[2][1] - perspUVList[0][1];
+	float vPlaneA = (vY1 * vZ2) - (vZ1 * vY2);
+	float vPlaneB = -((vX1 * vZ2) - (vZ1 * vX2));
+	float vPlaneC = (vX1 * vY2) - (vY1 * vX2);
+	float vPlaneD = -1.0f * (vPlaneA * vertices[0][0] + vPlaneB * vertices[0][1] + vPlaneC * perspUVList[0][1]);
+	
 
 	// Get Bounding Box:
 	float minX = min(min(vertices[0][0], vertices[1][0]), vertices[2][0]);
@@ -902,105 +1006,149 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 				if (currentZ >= 0) {
 					// Color Calculation:
 					GzIntensity redIntensity = 0, greenIntensity = 0, blueIntensity = 0;
-					if (interp_mode == GZ_FLAT) {	// Flat Shading
-						redIntensity = ctoi(flatcolor[0]);
-						greenIntensity = ctoi(flatcolor[1]);
-						blueIntensity = ctoi(flatcolor[2]);
-					}
-					else if (interp_mode == GZ_COLOR) {	//Gauroud Shading
-						GzColor intensity;
-						intensity[0] = -1.0f * (redPlaneA * (float)i + redPlaneB * (float)j + redPlaneD) / redPlaneC;
-						intensity[1] = -1.0f * (greenPlaneA * (float)i + greenPlaneB * (float)j + greenPlaneD) / greenPlaneC;
-						intensity[2] = -1.0f * (bluePlaneA * (float)i + bluePlaneB * (float)j + bluePlaneD) / bluePlaneC;
 
-						redIntensity = ctoi(intensity[0]);
-						greenIntensity = ctoi(intensity[1]);
-						blueIntensity = ctoi(intensity[2]);
-
-					}
-					else if (interp_mode == GZ_NORMALS) {	// Phong Shading
-						GzColor intensity;
-						GzCoord interpolatedNormal;
-						interpolatedNormal[0] = -1.0f * (normalX_PlaneA * (float)i + normalX_PlaneB * (float)j + normalX_PlaneD) / normalX_PlaneC;
-						interpolatedNormal[1] = -1.0f * (normalY_PlaneA * (float)i + normalY_PlaneB * (float)j + normalY_PlaneD) / normalY_PlaneC;
-						interpolatedNormal[2] = -1.0f * (normalZ_PlaneA * (float)i + normalZ_PlaneB * (float)j + normalZ_PlaneD) / normalZ_PlaneC;
-
-
-						GzColor specI, diffI, ambI;
-						for (int m = 0; m < 3; m++) {
-							specI[m] = 0;
-							diffI[m] = 0;
-							ambI[m] = 0;
+						if (interp_mode == GZ_FLAT) {	// Flat Shading
+							redIntensity = ctoi(flatcolor[0]);
+							greenIntensity = ctoi(flatcolor[1]);
+							blueIntensity = ctoi(flatcolor[2]);
 						}
+						else if (interp_mode == GZ_COLOR) {	//Gauroud Shading
+							GzColor intensity;
+							intensity[0] = -1.0f * (redPlaneA * (float)i + redPlaneB * (float)j + redPlaneD) / redPlaneC;
+							intensity[1] = -1.0f * (greenPlaneA * (float)i + greenPlaneB * (float)j + greenPlaneD) / greenPlaneC;
+							intensity[2] = -1.0f * (bluePlaneA * (float)i + bluePlaneB * (float)j + bluePlaneD) / bluePlaneC;
 
-						for (int m = 0; m < numlights; m++) {
-							GzCoord R, E;
+							if (tex_fun != NULL) {
+								GzTextureIndex currentUV;
+								GzColor uvColor;
+								float vzPrimeInterp = (float)currentZ / ((float)MAXINT - (float)currentZ);
+								currentUV[U] = -1.0f * (uPlaneA * (float)i + uPlaneB * (float)j + uPlaneD) / uPlaneC;
+								currentUV[V] = -1.0f * (vPlaneA * (float)i + vPlaneB * (float)j + vPlaneD) / vPlaneC;
 
-							E[0] = 0;
-							E[1] = 0;
-							E[2] = -1.0f;
+								currentUV[U] = currentUV[U] * (vzPrimeInterp + 1.0f);
+								currentUV[V] = currentUV[V] * (vzPrimeInterp + 1.0f);
 
-							float nDotL = interpolatedNormal[0] * (lights[m]).direction[0]
-								+ interpolatedNormal[1] * (lights[m]).direction[1]
-								+ interpolatedNormal[2] * (lights[m]).direction[2];
-							float nDotE = interpolatedNormal[0] * E[0] + interpolatedNormal[1] * E[1] + interpolatedNormal[2] * E[2];
-
-							if (nDotL * nDotE > 0) {
-								for (int k = 0; k < 3; k++) {
-									R[k] = 2.0f * nDotL * interpolatedNormal[k] - (lights[m]).direction[k];
+								int status = tex_fun(currentUV[U], currentUV[V], uvColor);
+								if (status) {
+									return GZ_FAILURE;
 								}
-								float lengthR = (float)sqrt((double)(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]));
-								for (int k = 0; k < 3; k++) {
-									R[k] /= lengthR;
+
+								for (int m = 0; m < 3; m++) {
+									intensity[m] *= uvColor[m];
 								}
+							}
 
-								for (int k = 0; k < 3; k++) {
-									float rDotE = R[0] * E[0] + R[1] * E[1] + R[2] * E[2];
-									if (rDotE < 0) {
-										rDotE = 0;
+							redIntensity = ctoi(intensity[0]);
+							greenIntensity = ctoi(intensity[1]);
+							blueIntensity = ctoi(intensity[2]);
+
+						}
+						else if (interp_mode == GZ_NORMALS) {	// Phong Shading
+							GzColor intensity;
+							GzCoord interpolatedNormal;
+							interpolatedNormal[0] = -1.0f * (normalX_PlaneA * (float)i + normalX_PlaneB * (float)j + normalX_PlaneD) / normalX_PlaneC;
+							interpolatedNormal[1] = -1.0f * (normalY_PlaneA * (float)i + normalY_PlaneB * (float)j + normalY_PlaneD) / normalY_PlaneC;
+							interpolatedNormal[2] = -1.0f * (normalZ_PlaneA * (float)i + normalZ_PlaneB * (float)j + normalZ_PlaneD) / normalZ_PlaneC;
+
+							if (tex_fun != NULL) {
+								GzTextureIndex currentUV;
+								GzColor uvColor;
+								float vzPrimeInterp = (float)currentZ / ((float)MAXINT - (float)currentZ);
+								currentUV[U] = -1.0f * (uPlaneA * (float)i + uPlaneB * (float)j + uPlaneD) / uPlaneC;
+								currentUV[V] = -1.0f * (vPlaneA * (float)i + vPlaneB * (float)j + vPlaneD) / vPlaneC;
+
+								currentUV[U] = currentUV[U] * (vzPrimeInterp + 1.0f);
+								currentUV[V] = currentUV[V] * (vzPrimeInterp + 1.0f);
+
+								int status = tex_fun(currentUV[U], currentUV[V], uvColor);
+								if (status) {
+									return GZ_FAILURE;
+								}
+								
+								for (int m = 0; m < 3; m++) {
+									Kd[m] = uvColor[m];
+									Ka[m] = uvColor[m];
+								}
+								
+
+							}
+
+							GzColor specI, diffI, ambI;
+							for (int m = 0; m < 3; m++) {
+								specI[m] = 0;
+								diffI[m] = 0;
+								ambI[m] = 0;
+							}
+
+							for (int m = 0; m < numlights; m++) {
+								GzCoord R, E;
+
+								E[0] = 0;
+								E[1] = 0;
+								E[2] = -1.0f;
+
+								float nDotL = interpolatedNormal[0] * (lights[m]).direction[0]
+									+ interpolatedNormal[1] * (lights[m]).direction[1]
+									+ interpolatedNormal[2] * (lights[m]).direction[2];
+								float nDotE = interpolatedNormal[0] * E[0] + interpolatedNormal[1] * E[1] + interpolatedNormal[2] * E[2];
+
+								if (nDotL * nDotE > 0) {
+									for (int k = 0; k < 3; k++) {
+										R[k] = 2.0f * nDotL * interpolatedNormal[k] - (lights[m]).direction[k];
 									}
-									if (rDotE > 1.0f) {
-										rDotE = 1.0f;
+									float lengthR = (float)sqrt((double)(R[0] * R[0] + R[1] * R[1] + R[2] * R[2]));
+									for (int k = 0; k < 3; k++) {
+										R[k] /= lengthR;
 									}
 
-									specI[k] += Ks[k] *
-										(float)pow((double)(rDotE), (double)spec)
-										* (lights[m]).color[k];
-									if (nDotL > 0 && nDotE > 0) {
-										diffI[k] += Kd[k] *
-											(interpolatedNormal[0] * (lights[m]).direction[0]
-												+ interpolatedNormal[1] * (lights[m]).direction[1]
-												+ interpolatedNormal[2] * (lights[m]).direction[2]) * (lights[m]).color[k];
-									}
-									else {
-										diffI[k] += Kd[k] *
-											(-1.0f * interpolatedNormal[0] * (lights[m]).direction[0]
-												- 1.0f * interpolatedNormal[1] * (lights[m]).direction[1]
-												- 1.0f * interpolatedNormal[2] * (lights[m]).direction[2]) * (lights[m]).color[k];
+									for (int k = 0; k < 3; k++) {
+										float rDotE = R[0] * E[0] + R[1] * E[1] + R[2] * E[2];
+										if (rDotE < 0) {
+											rDotE = 0;
+										}
+										if (rDotE > 1.0f) {
+											rDotE = 1.0f;
+										}
+
+										specI[k] += Ks[k] *
+											(float)pow((double)(rDotE), (double)spec)
+											* (lights[m]).color[k];
+										if (nDotL > 0 && nDotE > 0) {
+											diffI[k] += Kd[k] *
+												(interpolatedNormal[0] * (lights[m]).direction[0]
+													+ interpolatedNormal[1] * (lights[m]).direction[1]
+													+ interpolatedNormal[2] * (lights[m]).direction[2]) * (lights[m]).color[k];
+										}
+										else {
+											diffI[k] += Kd[k] *
+												(-1.0f * interpolatedNormal[0] * (lights[m]).direction[0]
+													- 1.0f * interpolatedNormal[1] * (lights[m]).direction[1]
+													- 1.0f * interpolatedNormal[2] * (lights[m]).direction[2]) * (lights[m]).color[k];
+										}
 									}
 								}
 							}
-						}
 
-						for (int m = 0; m < 3; m++) {
-							ambI[m] += Ka[m] * ambientlight.color[m];
-						}
-
-
-						for (int m = 0; m < 3; m++) {
-							intensity[m] = specI[m] + diffI[m] + ambI[m];
-							if (intensity[m] > 1.0) {
-								intensity[m] = 1.0;
+							for (int m = 0; m < 3; m++) {
+								ambI[m] += Ka[m] * ambientlight.color[m];
 							}
-							if (intensity[m] < 0) {
-								intensity[m] = 0;
-							}
-						}
 
-						redIntensity = ctoi(intensity[0]);
-						greenIntensity = ctoi(intensity[1]);
-						blueIntensity = ctoi(intensity[2]);
-					}
+
+							for (int m = 0; m < 3; m++) {
+								intensity[m] = specI[m] + diffI[m] + ambI[m];
+								if (intensity[m] > 1.0) {
+									intensity[m] = 1.0;
+								}
+								if (intensity[m] < 0) {
+									intensity[m] = 0;
+								}
+							}
+
+							redIntensity = ctoi(intensity[0]);
+							greenIntensity = ctoi(intensity[1]);
+							blueIntensity = ctoi(intensity[2]);
+						}
+					
 
 					// Call GzPut to push the pixel to pixelbuffer.
 					GzPut(i, j, redIntensity, greenIntensity, blueIntensity, 1, currentZ);

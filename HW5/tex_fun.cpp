@@ -43,26 +43,30 @@ int tex_fun(float u, float v, GzColor color)
 /* bounds-test u,v to make sure nothing will overflow image array bounds */
 /* determine texture cell corner values and perform bilinear interpolation */
 /* set color to interpolated GzColor value and return */
-  if (u > 1)
-	  u = 1;
+  
+  if (u > 1.0f)
+	  u = 1.0f;
   if (u < 0)
 	  u = 0;
-  if (v > 1)
-	  v = 1;
+  if (v > 1.0f)
+	  v = 1.0f;
   if (v < 0)
 	  v = 0;
+  
   float factorU = (float)(xs - 1);
   float factorV = (float)(ys - 1);
   float rawU = u * factorU;
   float rawV = v * factorV;
+
+
 
   int upperBoundX = (int)ceil(rawU);
   int lowerBoundX = (int)floor(rawU);
   int upperBoundY = (int)ceil(rawV);
   int lowerBoundY = (int)floor(rawV);
 
-  float the_s = u - (float)lowerBoundX;
-  float the_t = v - (float)lowerBoundY;
+  float the_s = rawU - (float)lowerBoundX;
+  float the_t = rawV - (float)lowerBoundY;
 
   GzColor colorA, colorB, colorC, colorD;
 
@@ -81,13 +85,18 @@ int tex_fun(float u, float v, GzColor color)
   colorD[RED] = image[upperBoundY * xs + lowerBoundX][RED];
   colorD[GREEN] = image[upperBoundY * xs + lowerBoundX][GREEN];
   colorD[BLUE] = image[upperBoundY * xs + lowerBoundX][BLUE];
-
-  color[RED] = the_s * the_t * colorC[RED] + (1 - the_s) * the_t * colorD[RED]
-	  + the_s * (1 - the_t) * colorB[RED] + (1 - the_s) * (1 - the_t) * colorA[RED];
+  /*
+  char buffer[50];
+  sprintf(buffer, "tex_fun = %4.4f, %4.4f", rawU, rawV);
+  OutputDebugStringA(buffer);
+  */
+  color[RED] = the_s * the_t * colorC[RED] + (1.0f - the_s) * the_t * colorD[RED]
+	  + the_s * (1.0f - the_t) * colorB[RED] + (1.0f - the_s) * (1.0f - the_t) * colorA[RED];
   color[GREEN] = the_s * the_t * colorC[GREEN] + (1 - the_s) * the_t * colorD[GREEN]
-	  + the_s * (1 - the_t) * colorB[GREEN] + (1 - the_s) * (1 - the_t) * colorA[GREEN];
-  color[BLUE] = the_s * the_t * colorC[BLUE] + (1 - the_s) * the_t * colorD[BLUE]
-	  + the_s * (1 - the_t) * colorB[BLUE] + (1 - the_s) * (1 - the_t) * colorA[BLUE];
+	  + the_s * (1.0f - the_t) * colorB[GREEN] + (1.0f - the_s) * (1.0f - the_t) * colorA[GREEN];
+  color[BLUE] = the_s * the_t * colorC[BLUE] + (1.0f - the_s) * the_t * colorD[BLUE]
+	  + the_s * (1.0f - the_t) * colorB[BLUE] + (1.0f - the_s) * (1.0f - the_t) * colorA[BLUE];
+
 
   
 	return GZ_SUCCESS;
@@ -96,6 +105,43 @@ int tex_fun(float u, float v, GzColor color)
 /* Procedural texture function */
 int ptex_fun(float u, float v, GzColor color)
 {
+	// Checkboard of "Blue and GreyBlue"
+	xs = 100;
+	ys = 100;
+
+	int quadSize = 20;
+
+	if (u > 1.0f)
+		u = 1.0f;
+	if (u < 0)
+		u = 0;
+	if (v > 1.0f)
+		v = 1.0f;
+	if (v < 0)
+		v = 0;
+
+	float factorU = (float)(xs - 1);
+	float factorV = (float)(ys - 1);
+	int rawU = (int)round(u * factorU);
+	int rawV = (int)round(v * factorV);
+
+	if (rawU % quadSize < quadSize / 2 && rawV % quadSize < quadSize / 2) {
+		color[RED] = 0.5f;
+		color[GREEN] = 0.9f;
+		color[BLUE] = 0.9f;
+	}
+	else if (rawU % quadSize >= quadSize / 2 && rawV % quadSize >= quadSize / 2) {
+		color[RED] = 0.5f;
+		color[GREEN] = 0.9f;
+		color[BLUE] = 0.9f;
+	}
+	else {
+		color[RED] = 0.2f;
+		color[GREEN] = 0.4f;
+		color[BLUE] = 0.8f;
+	}
+
+	
 
 	return GZ_SUCCESS;
 }
