@@ -1070,9 +1070,8 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 									Ka[m] = uvColor[m];
 								}
 								
-
 							}
-
+							
 							GzColor specI, diffI, ambI;
 							for (int m = 0; m < 3; m++) {
 								specI[m] = 0;
@@ -1109,10 +1108,11 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 										if (rDotE > 1.0f) {
 											rDotE = 1.0f;
 										}
-
+										
 										specI[k] += Ks[k] *
 											(float)pow((double)(rDotE), (double)spec)
 											* (lights[m]).color[k];
+										
 										if (nDotL > 0 && nDotE > 0) {
 											diffI[k] += Kd[k] *
 												(interpolatedNormal[0] * (lights[m]).direction[0]
@@ -1143,10 +1143,11 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 									intensity[m] = 0;
 								}
 							}
-
+							
 							redIntensity = ctoi(intensity[0]);
 							greenIntensity = ctoi(intensity[1]);
 							blueIntensity = ctoi(intensity[2]);
+							
 						}
 					
 

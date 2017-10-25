@@ -105,12 +105,11 @@ int tex_fun(float u, float v, GzColor color)
 /* Procedural texture function */
 int ptex_fun(float u, float v, GzColor color)
 {
-	// Checkboard of "Blue and GreyBlue"
-	xs = 100;
-	ys = 100;
+	// "Circleboard" of "Blue and GreyBlue"
+	xs = 200;
+	ys = 200;
 
-	int quadSize = 20;
-
+	int quadSize = 40;
 	if (u > 1.0f)
 		u = 1.0f;
 	if (u < 0)
@@ -125,23 +124,30 @@ int ptex_fun(float u, float v, GzColor color)
 	int rawU = (int)round(u * factorU);
 	int rawV = (int)round(v * factorV);
 
-	if (rawU % quadSize < quadSize / 2 && rawV % quadSize < quadSize / 2) {
-		color[RED] = 0.5f;
-		color[GREEN] = 0.9f;
-		color[BLUE] = 0.9f;
-	}
-	else if (rawU % quadSize >= quadSize / 2 && rawV % quadSize >= quadSize / 2) {
-		color[RED] = 0.5f;
-		color[GREEN] = 0.9f;
-		color[BLUE] = 0.9f;
+	int centerU, centerV;
+	if (rawU % quadSize < quadSize / 2) {
+		centerU = rawU + quadSize / 2 - (rawU % quadSize);
 	}
 	else {
+		centerU = rawU - (rawU % quadSize - quadSize / 2);
+	}
+	if (rawV % quadSize < quadSize / 2) {
+		centerV = rawV + quadSize / 2 - (rawV % quadSize);
+	}
+	else {
+		centerV = rawV - (rawV % quadSize - quadSize / 2);
+	}
+
+	if (pow(centerU - rawU, 2.0) + pow(centerV - rawV, 2.0) < pow(quadSize / 2 - 1.0f, 2.0)) {
 		color[RED] = 0.2f;
 		color[GREEN] = 0.4f;
 		color[BLUE] = 0.8f;
 	}
-
-	
+	else {
+		color[RED] = 0.5f;
+		color[GREEN] = 0.9f;
+		color[BLUE] = 0.9f;
+	}
 
 	return GZ_SUCCESS;
 }
