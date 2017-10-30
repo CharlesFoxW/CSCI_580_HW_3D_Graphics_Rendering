@@ -765,7 +765,23 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 	}
 
 	// For texture color of Gouraud Shading:
-	
+	/*
+	GzColor uvVertexColor[3] = {0};
+	if (interp_mode == GZ_COLOR && tex_fun != NULL) {
+		//GzTextureIndex currentUV;
+		
+		//currentUV[U] = -1.0f * (uPlaneA * (float)i + uPlaneB * (float)j + uPlaneD) / uPlaneC;
+		//currentUV[V] = -1.0f * (vPlaneA * (float)i + vPlaneB * (float)j + vPlaneD) / vPlaneC;
+
+		int status = tex_fun(uvList[0][U], uvList[0][V], uvVertexColor[0]);
+		status |= tex_fun(uvList[0][U], uvList[0][V], uvVertexColor[1]);
+		status |= tex_fun(uvList[0][U], uvList[0][V], uvVertexColor[2]);
+		if (status) {
+			return GZ_FAILURE;
+		}
+
+	}
+	*/
 	if (interp_mode == GZ_COLOR) {	// Gouraud Shading without texture
 		for (int j = 0; j < 3; j++) {	// j is vertex
 			for (int i = 0; i < numlights; i++) {	// i is light
@@ -913,6 +929,22 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 	float normalZ_PlaneB = -((normalZ_X1 * normalZ_Z2) - (normalZ_Z1 * normalZ_X2));
 	float normalZ_PlaneC = (normalZ_X1 * normalZ_Y2) - (normalZ_Y1 * normalZ_X2);
 	float normalZ_PlaneD = -1.0f * (normalZ_PlaneA * vertices[0][0] + normalZ_PlaneB * vertices[0][1] + normalZ_PlaneC * normals[0][2]);
+	/*
+	GzColor vertTextColor[3] = {0};
+	if (tex_fun != NULL) {
+
+		int status = tex_fun(uvList[0][U], uvList[0][V], vertTextColor[0]);
+		status |= tex_fun(uvList[1][U], uvList[1][V], vertTextColor[1]);
+		status |= tex_fun(uvList[2][U], uvList[2][V], vertTextColor[2]);
+		if (status) {
+			return GZ_FAILURE;
+		}
+
+		//char buffer[50];
+		//sprintf(buffer, "tex_fun = %4.4f, %4.4f", vertTextColor[0][0], vertTextColor[0][1]);
+		//OutputDebugStringA(buffer);
+	}
+	*/
 
 	// Perspective Correction:
 	float vZPrime;
