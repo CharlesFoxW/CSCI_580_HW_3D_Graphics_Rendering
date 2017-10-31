@@ -26,6 +26,12 @@ extern int tex_fun(float u, float v, GzColor color); /* image texture function *
 extern int ptex_fun(float u, float v, GzColor color); /* procedural texture function */
 extern int GzFreeTexture();
 
+float AAFilter[AAKERNEL_SIZE][3] /* X-shift, Y-shift, weight */
+{
+	-0.52, 0.38, 0.128, 0.41, 0.56, 0.119, 0.27, 0.08, 0.294,
+	-0.17, -0.29, 0.249, 0.58, -0.55, 0.104, -0.31, -0.71, 0.106
+};
+
 void shade(GzCoord norm, GzCoord color);
 
 //////////////////////////////////////////////////////////////////////
@@ -51,6 +57,8 @@ int Application5::Initialize()
 	GzPointer   valueListShader[9];		/* shader attribute pointers */
 	GzToken     nameListLights[10];		/* light info */
 	GzPointer   valueListLights[10];
+	GzToken     nameListShift[5];		/* light info */
+	GzPointer   valueListShift[5];
 	int			shaderType, interpStyle;
 	float		specpower;
 	int		status; 
@@ -68,121 +76,149 @@ int Application5::Initialize()
  	m_nWidth = 256;		// frame buffer and display width
 	m_nHeight = 256;    // frame buffer and display height
 
-	m_pRender = new GzRender(m_nWidth, m_nHeight);
-	m_pRender->GzDefault();
+	for (int i = 0; i < AAKERNEL_SIZE + 1; i++) {
+		m_pRender[i] = new GzRender(m_nWidth, m_nHeight);
+		m_pRender[i]->GzDefault();
 
-	m_pFrameBuffer = m_pRender->framebuffer; 
 
-/* Translation matrix */
-GzMatrix	scale = 
-{ 
-	3.25,	0.0,	0.0,	0.0, 
-	0.0,	3.25,	0.0,	-3.25, 
-	0.0,	0.0,	3.25,	3.5, 
-	0.0,	0.0,	0.0,	1.0 
-}; 
- 
-GzMatrix	rotateX = 
-{ 
-	1.0,	0.0,	0.0,	0.0, 
-	0.0,	.7071,	.7071,	0.0, 
-	0.0,	-.7071,	.7071,	0.0, 
-	0.0,	0.0,	0.0,	1.0 
-}; 
- 
-GzMatrix	rotateY = 
-{ 
-	.866,	0.0,	-0.5,	0.0, 
-	0.0,	1.0,	0.0,	0.0, 
-	0.5,	0.0,	.866,	0.0, 
-	0.0,	0.0,	0.0,	1.0 
-}; 
+		//m_pFrameBuffer = m_pRender[i]->framebuffer;
+		//m_pFrameBuffer = new char[m_nWidth * m_nHeight* RGB_DIMEMSION];
+	/* Translation matrix */
+		GzMatrix	scale =
+		{
+			3.25,	0.0,	0.0,	0.0,
+			0.0,	3.25,	0.0,	-3.25,
+			0.0,	0.0,	3.25,	3.5,
+			0.0,	0.0,	0.0,	1.0
+		};
+
+		GzMatrix	rotateX =
+		{
+			1.0,	0.0,	0.0,	0.0,
+			0.0,	.7071,	.7071,	0.0,
+			0.0,	-.7071,	.7071,	0.0,
+			0.0,	0.0,	0.0,	1.0
+		};
+
+		GzMatrix	rotateY =
+		{
+			.866,	0.0,	-0.5,	0.0,
+			0.0,	1.0,	0.0,	0.0,
+			0.5,	0.0,	.866,	0.0,
+			0.0,	0.0,	0.0,	1.0
+		};
 
 #if 1 	/* set up app-defined camera if desired, else use camera defaults */
-    camera.position[X] = -3;
-    camera.position[Y] = -25;
-    camera.position[Z] = -4;
+		camera.position[X] = -3;
+		camera.position[Y] = -25;
+		camera.position[Z] = -4;
 
-    camera.lookat[X] = 7.8;
-    camera.lookat[Y] = 0.7;
-    camera.lookat[Z] = 6.5;
+		camera.lookat[X] = 7.8;
+		camera.lookat[Y] = 0.7;
+		camera.lookat[Z] = 6.5;
 
-    camera.worldup[X] = -0.2;
-    camera.worldup[Y] = 1.0;
-    camera.worldup[Z] = 0.0;
+		camera.worldup[X] = -0.2;
+		camera.worldup[Y] = 1.0;
+		camera.worldup[Z] = 0.0;
 
-    camera.FOV = 63.7;              /* degrees *              /* degrees */
+		camera.FOV = 63.7;              /* degrees *              /* degrees */
 
-	status |= m_pRender->GzPutCamera(camera); 
+		status |= m_pRender[i]->GzPutCamera(camera);
+
 #endif 
 
-	/* Start Renderer */
-	status |= m_pRender->GzBeginRender();
+		/* Start Renderer */
 
-	/* Light */
-	GzLight	light1 = { {-0.7071, 0.7071, 0}, {0.5, 0.5, 0.9} };
-	GzLight	light2 = { {0, -0.7071, -0.7071}, {0.9, 0.2, 0.3} };
-	GzLight	light3 = { {0.7071, 0.0, -0.7071}, {0.2, 0.7, 0.3} };
-	GzLight	ambientlight = { {0, 0, 0}, {0.3, 0.3, 0.3} };
+		status |= m_pRender[i]->GzBeginRender();
 
-	/* Material property */
-	GzColor specularCoefficient = { 0.3, 0.3, 0.3 };
-	GzColor ambientCoefficient = { 0.1, 0.1, 0.1 };
-	GzColor diffuseCoefficient = {0.7, 0.7, 0.7};
 
-/* 
-  renderer is ready for frame --- define lights and shader at start of frame 
-*/
+		/* Light */
+		GzLight	light1 = { {-0.7071, 0.7071, 0}, {0.5, 0.5, 0.9} };
+		GzLight	light2 = { {0, -0.7071, -0.7071}, {0.9, 0.2, 0.3} };
+		GzLight	light3 = { {0.7071, 0.0, -0.7071}, {0.2, 0.7, 0.3} };
+		GzLight	ambientlight = { {0, 0, 0}, {0.3, 0.3, 0.3} };
 
-        /*
-         * Tokens associated with light parameters
-         */
-        nameListLights[0] = GZ_DIRECTIONAL_LIGHT;
-        valueListLights[0] = (GzPointer)&light1;
-        nameListLights[1] = GZ_DIRECTIONAL_LIGHT;
-        valueListLights[1] = (GzPointer)&light2;
-        nameListLights[2] = GZ_DIRECTIONAL_LIGHT;
-        valueListLights[2] = (GzPointer)&light3;
-        status |= m_pRender->GzPutAttribute(3, nameListLights, valueListLights);
+		/* Material property */
+		GzColor specularCoefficient = { 0.3, 0.3, 0.3 };
+		GzColor ambientCoefficient = { 0.1, 0.1, 0.1 };
+		GzColor diffuseCoefficient = { 0.7, 0.7, 0.7 };
 
-        nameListLights[0] = GZ_AMBIENT_LIGHT;
-        valueListLights[0] = (GzPointer)&ambientlight;
-        status |= m_pRender->GzPutAttribute(1, nameListLights, valueListLights);
+		/*
+		  renderer is ready for frame --- define lights and shader at start of frame
+		*/
 
-        /*
-         * Tokens associated with shading 
-         */
-        nameListShader[0]  = GZ_DIFFUSE_COEFFICIENT;
-        valueListShader[0] = (GzPointer)diffuseCoefficient;
+		/*
+		 * Tokens associated with light parameters
+		 */
+		nameListLights[0] = GZ_DIRECTIONAL_LIGHT;
+		valueListLights[0] = (GzPointer)&light1;
+		nameListLights[1] = GZ_DIRECTIONAL_LIGHT;
+		valueListLights[1] = (GzPointer)&light2;
+		nameListLights[2] = GZ_DIRECTIONAL_LIGHT;
+		valueListLights[2] = (GzPointer)&light3;
 
-	/* 
-	* Select either GZ_COLOR or GZ_NORMALS as interpolation mode  
-	*/
-        nameListShader[1]  = GZ_INTERPOLATE;
-        //interpStyle = GZ_COLOR;         /* Gouraud shading */
-        interpStyle = GZ_NORMALS;         /* Phong shading */
-        valueListShader[1] = (GzPointer)&interpStyle;
+		status |= m_pRender[i]->GzPutAttribute(3, nameListLights, valueListLights);
 
-        nameListShader[2]  = GZ_AMBIENT_COEFFICIENT;
-        valueListShader[2] = (GzPointer)ambientCoefficient;
-        nameListShader[3]  = GZ_SPECULAR_COEFFICIENT;
-        valueListShader[3] = (GzPointer)specularCoefficient;
-        nameListShader[4]  = GZ_DISTRIBUTION_COEFFICIENT;
-        specpower = 32;
-        valueListShader[4] = (GzPointer)&specpower;
 
-        nameListShader[5]  = GZ_TEXTURE_MAP;
-#if 1   /* set up null texture function or valid pointer */
-        valueListShader[5] = (GzPointer)0;
+		nameListLights[0] = GZ_AMBIENT_LIGHT;
+		valueListLights[0] = (GzPointer)&ambientlight;
+
+		status |= m_pRender[i]->GzPutAttribute(1, nameListLights, valueListLights);
+
+
+		/*
+		 * Tokens associated with shading
+		 */
+		nameListShader[0] = GZ_DIFFUSE_COEFFICIENT;
+		valueListShader[0] = (GzPointer)diffuseCoefficient;
+
+		/*
+		* Select either GZ_COLOR or GZ_NORMALS as interpolation mode
+		*/
+		nameListShader[1] = GZ_INTERPOLATE;
+		//interpStyle = GZ_COLOR;         /* Gouraud shading */
+		interpStyle = GZ_NORMALS;         /* Phong shading */
+		valueListShader[1] = (GzPointer)&interpStyle;
+
+		nameListShader[2] = GZ_AMBIENT_COEFFICIENT;
+		valueListShader[2] = (GzPointer)ambientCoefficient;
+		nameListShader[3] = GZ_SPECULAR_COEFFICIENT;
+		valueListShader[3] = (GzPointer)specularCoefficient;
+		nameListShader[4] = GZ_DISTRIBUTION_COEFFICIENT;
+		specpower = 32;
+		valueListShader[4] = (GzPointer)&specpower;
+
+		nameListShader[5] = GZ_TEXTURE_MAP;
+#if 0   /* set up null texture function or valid pointer */
+		valueListShader[5] = (GzPointer)0;
 #else
-        valueListShader[5] = (GzPointer)(tex_fun);	/* or use ptex_fun */
+		valueListShader[5] = (GzPointer)(tex_fun);	/* or use ptex_fun */
 #endif
-        status |= m_pRender->GzPutAttribute(6, nameListShader, valueListShader);
 
+		status |= m_pRender[i]->GzPutAttribute(6, nameListShader, valueListShader);
 
-	status |= m_pRender->GzPushMatrix(scale);  
-	status |= m_pRender->GzPushMatrix(rotateY); 
-	status |= m_pRender->GzPushMatrix(rotateX); 
+		float zeroOffset = 0;
+		nameListShift[0] = GZ_AASHIFTX;
+		nameListShift[1] = GZ_AASHIFTY;
+
+		if (i == AAKERNEL_SIZE) {
+			valueListShift[0] = (GzPointer)&zeroOffset;
+			valueListShift[1] = (GzPointer)&zeroOffset;
+		}
+		else {
+			valueListShift[0] = (GzPointer)&(AAFilter[i][0]);
+			valueListShift[1] = (GzPointer)&(AAFilter[i][1]);
+		}
+
+		status |= m_pRender[i]->GzPutAttribute(2, nameListShift, valueListShift);
+
+		status |= m_pRender[i]->GzPushMatrix(scale);
+		status |= m_pRender[i]->GzPushMatrix(rotateY);
+		status |= m_pRender[i]->GzPushMatrix(rotateX);
+
+}
+
+	m_pFrameBuffer = m_pRender[AAKERNEL_SIZE]->framebuffer;
 
 	if (status) exit(GZ_FAILURE); 
 
@@ -204,78 +240,113 @@ int Application5::Render()
 
 
 	/* Initialize Display */
-	status |= m_pRender->GzDefault();  /* init for new frame */
-	
-	/* 
-	* Tokens associated with triangle vertex values 
-	*/ 
-	nameListTriangle[0] = GZ_POSITION; 
-	nameListTriangle[1] = GZ_NORMAL; 
-	nameListTriangle[2] = GZ_TEXTURE_INDEX;  
+	for (int i = 0; i < AAKERNEL_SIZE + 1; i++) {
 
-	// I/O File open
-	FILE *infile;
-	if( (infile  = fopen( INFILE , "r" )) == NULL )
-	{
-         AfxMessageBox( "The input file was not opened\n" );
-		 return GZ_FAILURE;
+		status |= m_pRender[i]->GzDefault();  /* init for new frame */
+
+	/*
+	* Tokens associated with triangle vertex values
+	*/
+		nameListTriangle[0] = GZ_POSITION;
+		nameListTriangle[1] = GZ_NORMAL;
+		nameListTriangle[2] = GZ_TEXTURE_INDEX;
+
+		// I/O File open
+		FILE *infile;
+		if ((infile = fopen(INFILE, "r")) == NULL)
+		{
+			AfxMessageBox("The input file was not opened\n");
+			return GZ_FAILURE;
+		}
+
+
+		/*
+		* Walk through the list of triangles, set color
+		* and render each triangle
+		*/
+		while (fscanf(infile, "%s", dummy) == 1) { 	/* read in tri word */
+			fscanf(infile, "%f %f %f %f %f %f %f %f",
+				&(vertexList[0][0]), &(vertexList[0][1]),
+				&(vertexList[0][2]),
+				&(normalList[0][0]), &(normalList[0][1]),
+				&(normalList[0][2]),
+				&(uvList[0][0]), &(uvList[0][1]));
+			fscanf(infile, "%f %f %f %f %f %f %f %f",
+				&(vertexList[1][0]), &(vertexList[1][1]),
+				&(vertexList[1][2]),
+				&(normalList[1][0]), &(normalList[1][1]),
+				&(normalList[1][2]),
+				&(uvList[1][0]), &(uvList[1][1]));
+			fscanf(infile, "%f %f %f %f %f %f %f %f",
+				&(vertexList[2][0]), &(vertexList[2][1]),
+				&(vertexList[2][2]),
+				&(normalList[2][0]), &(normalList[2][1]),
+				&(normalList[2][2]),
+				&(uvList[2][0]), &(uvList[2][1]));
+
+			/*
+			 * Set the value pointers to the first vertex of the
+			 * triangle, then feed it to the renderer
+			 * NOTE: this sequence matches the nameList token sequence
+			 */
+			valueListTriangle[0] = (GzPointer)vertexList;
+			valueListTriangle[1] = (GzPointer)normalList;
+			valueListTriangle[2] = (GzPointer)uvList;
+
+			m_pRender[i]->GzPutTriangle(3, nameListTriangle, valueListTriangle);
+		}
+
+		//m_pRender[0]->GzFlushDisplay2File(outfile); 	/* write out or update display to file*/
+		//m_pRender[i]->GzFlushDisplay2FrameBuffer();	// write out or update display to frame buffer
+
+	/*
+	 * Close file
+	 */
+		if (fclose(infile))
+			AfxMessageBox(_T("The input file was not closed\n"));
+
+
+	}
+
+	//GzRender finalRender(m_nWidth, m_nHeight);
+	//finalRender.GzDefault();
+
+	//m_pFrameBuffer = finalRender.framebuffer;
+
+	for (int j = 0; j < m_nWidth * m_nHeight; j++) {
+		float redSum = 0;
+		float greenSum = 0;
+		float blueSum = 0;
+
+		for (int i = 0; i < AAKERNEL_SIZE; i++) {
+			redSum += (float)m_pRender[i]->pixelbuffer[j].red * AAFilter[i][2];
+			greenSum += (float)m_pRender[i]->pixelbuffer[j].green * AAFilter[i][2];
+			blueSum += (float)m_pRender[i]->pixelbuffer[j].blue * AAFilter[i][2];
+		}
+
+		m_pRender[AAKERNEL_SIZE]->pixelbuffer[j].red = (short)(redSum + 0.5);
+		m_pRender[AAKERNEL_SIZE]->pixelbuffer[j].green = (short)(greenSum + 0.5);
+		m_pRender[AAKERNEL_SIZE]->pixelbuffer[j].blue = (short)(blueSum + 0.5);
+
+		//char buffer[50];
+		//if (m_pRender[AAKERNEL_SIZE]->pixelbuffer[j].red != 2880)
+		//sprintf(buffer, "R G = %d, %d.\n", m_pRender[AAKERNEL_SIZE]->pixelbuffer[j].red, m_pRender[AAKERNEL_SIZE]->pixelbuffer[j].green);
+		//OutputDebugStringA(buffer);
 	}
 
 	FILE *outfile;
-	if( (outfile  = fopen( OUTFILE , "wb" )) == NULL )
+	if ((outfile = fopen(OUTFILE, "wb")) == NULL)
 	{
-         AfxMessageBox( "The output file was not opened\n" );
-		 return GZ_FAILURE;
+		AfxMessageBox("The output file was not opened\n");
+		return GZ_FAILURE;
 	}
 
-	/* 
-	* Walk through the list of triangles, set color 
-	* and render each triangle 
-	*/ 
-	while( fscanf(infile, "%s", dummy) == 1) { 	/* read in tri word */
-	    fscanf(infile, "%f %f %f %f %f %f %f %f", 
-		&(vertexList[0][0]), &(vertexList[0][1]),  
-		&(vertexList[0][2]), 
-		&(normalList[0][0]), &(normalList[0][1]), 	
-		&(normalList[0][2]), 
-		&(uvList[0][0]), &(uvList[0][1]) ); 
-	    fscanf(infile, "%f %f %f %f %f %f %f %f", 
-		&(vertexList[1][0]), &(vertexList[1][1]), 	
-		&(vertexList[1][2]), 
-		&(normalList[1][0]), &(normalList[1][1]), 	
-		&(normalList[1][2]), 
-		&(uvList[1][0]), &(uvList[1][1]) ); 
-	    fscanf(infile, "%f %f %f %f %f %f %f %f", 
-		&(vertexList[2][0]), &(vertexList[2][1]), 	
-		&(vertexList[2][2]), 
-		&(normalList[2][0]), &(normalList[2][1]), 	
-		&(normalList[2][2]), 
-		&(uvList[2][0]), &(uvList[2][1]) ); 
+	m_pRender[AAKERNEL_SIZE]->GzFlushDisplay2File(outfile);
+	m_pRender[AAKERNEL_SIZE]->GzFlushDisplay2FrameBuffer();
 
-	    /* 
-	     * Set the value pointers to the first vertex of the 	
-	     * triangle, then feed it to the renderer 
-	     * NOTE: this sequence matches the nameList token sequence
-	     */ 
-	     valueListTriangle[0] = (GzPointer)vertexList; 
-		 valueListTriangle[1] = (GzPointer)normalList; 
-		 valueListTriangle[2] = (GzPointer)uvList; 
-		 m_pRender->GzPutTriangle(3, nameListTriangle, valueListTriangle); 
-	} 
+	if (fclose(outfile))
+		AfxMessageBox(_T("The output file was not closed\n"));
 
-	m_pRender->GzFlushDisplay2File(outfile); 	/* write out or update display to file*/
-	m_pRender->GzFlushDisplay2FrameBuffer();	// write out or update display to frame buffer
-
-	/* 
-	 * Close file
-	 */ 
-
-	if( fclose( infile ) )
-      AfxMessageBox(_T( "The input file was not closed\n" ));
-
-	if( fclose( outfile ) )
-      AfxMessageBox(_T( "The output file was not closed\n" ));
- 
 	if (status) 
 		return(GZ_FAILURE); 
 	else 
@@ -289,7 +360,9 @@ int Application5::Clean()
 	 */ 
 	int	status = 0; 
 
-	free(m_pRender);
+	for (int i = 0; i < AAKERNEL_SIZE + 1; i++) {
+		free(m_pRender[i]);
+	}
 	status |= GzFreeTexture();
 	
 	if (status) 

@@ -17,6 +17,13 @@
 #define	MATLEVELS	100		/* how many matrix pushes allowed */
 #define	MAX_LIGHTS	10		/* how many lights allowed */
 
+/***********************************************/
+/* HW1 methods: copy here the methods from HW1 */
+
+#define RGBA_DIMEMSION	4	/* RGBA -> 4D color */
+#define RGB_DIMEMSION	3	/* RGB -> 3D color */
+#define COLOR_LIMIT		4095	/* Clamping the color value into 0~4095. */
+
 class GzRender{			/* define a renderer */
   
 
@@ -28,6 +35,7 @@ public:
 
 	GzCamera		m_camera;
 	short		    matlevel;	        /* top of stack - current xform */
+	short			matlevelNormal;		/* top of stack - current xnorm */
 	GzMatrix		Ximage[MATLEVELS];	/* stack of xforms (Xsm) */
 	GzMatrix		Xnorm[MATLEVELS];	/* xforms for norms (Xim) */
 	GzMatrix		Xsp;		        /* NDC to screen (pers-to-screen) */
@@ -39,6 +47,10 @@ public:
 	GzColor		Ka, Kd, Ks;
 	float		    spec;		/* specular power */
 	GzTexture		tex_fun;    /* tex_fun(float u, float v, GzColor color) */
+	// HW 6
+	float		Xoffset;
+	float		Yoffset;
+	float		weight;
 
   	// Constructors
 	GzRender(int xRes, int yRes);

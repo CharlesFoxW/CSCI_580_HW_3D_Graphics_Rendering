@@ -10,16 +10,10 @@
 
 #define PI (float) 3.14159265358979323846
 
-/***********************************************/
-/* HW1 methods: copy here the methods from HW1 */
 
-#define RGBA_DIMEMSION	4	/* RGBA -> 4D color */
-#define RGB_DIMEMSION	3	/* RGB -> 3D color */
-#define COLOR_LIMIT		4095	/* Clamping the color value into 0~4095. */
-
-static short matlevelNormal;	/* Global variable of the head of matrix stack of normals */
+//short matlevelNormal;	/* Global variable of the head of matrix stack of normals */
 int pushMatToStack(short &head, GzMatrix* matStack, GzMatrix mat);
-int popMatToStack(short &head, GzMatrix* matStack);
+int popMatFromStack(short &head, GzMatrix* matStack);
 
 int GzRender::GzRotXMat(float degree, GzMatrix mat)
 {
@@ -189,14 +183,14 @@ GzRender::~GzRender()
 int GzRender::GzDefault()
 {
 /* HW1.3 set pixel buffer to some default values - start a new frame */
-	GzPixel defaultPixel = { 2880, 2880, 2880, 1, MAXINT };
+	GzPixel defaultPixel = { 1680, 1680, 1680, 1, MAXINT };
 
 	int resolution = xres * yres;
 	for (int i = 0; i < resolution; i++) {
 		pixelbuffer[i] = defaultPixel;
-		framebuffer[RGB_DIMEMSION * i] = (char)2880;
-		framebuffer[RGB_DIMEMSION * i + 1] = (char)2880;
-		framebuffer[RGB_DIMEMSION * i + 2] = (char)2880;
+		framebuffer[RGB_DIMEMSION * i] = (char)4095;
+		framebuffer[RGB_DIMEMSION * i + 1] = (char)4095;
+		framebuffer[RGB_DIMEMSION * i + 2] = (char)4095;
 		//framebuffer[RGB_DIMEMSION * i + 3] = (char)MAXINT;	// initialize Z.
 	}
 
@@ -365,8 +359,12 @@ int GzRender::GzPopMatrix()
 - pop a matrix off the Ximage stack
 - check for stack underflow
 */
-	if (popMatToStack(matlevel, Ximage))
+	if (popMatFromStack(matlevel, Ximage))
 		return GZ_FAILURE;
+
+	if (popMatFromStack(matlevelNormal, Xnorm))
+		return GZ_FAILURE;
+
 	return GZ_SUCCESS;
 }
 
@@ -578,6 +576,17 @@ int GzRender::GzPutAttribute(int numAttributes, GzToken	*nameList, GzPointer *va
 			if (textureFunc != NULL)
 				tex_fun = textureFunc;
 		}
+		break;
+		case GZ_AASHIFTX: {
+			float* shiftX = (float*)valueList[index];
+			Xoffset = *shiftX;
+		}
+		break;
+		case GZ_AASHIFTY: {
+			float* shiftY = (float*)valueList[index];
+			Yoffset = *shiftY;
+		}
+		break;
 		default:
 			break;
 		}
@@ -609,11 +618,6 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 	GzCoord vertices[3], normals[3];
 	GzTextureIndex uvList[3];
 	
-	/*
-	char buffer[50];
-	sprintf(buffer, "uv = %4.4f, %4.4f", uvListPointer[0][0], uvListPointer[0][1]);
-	OutputDebugStringA(buffer);
-	*/
 
 	// Construct 4D vector:
 	float vertices4D[3][4], normals4D[3][4];
@@ -625,8 +629,9 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 		}
 		vertices4D[j][3] = 1.0f;
 		normals4D[j][3] = 1.0f;
+		
 	}
-
+	
 	// Transformation M * Vertex Coord.
 	for (int k = 0; k < 3; k++) {
 		for (int j = 0; j < 4; j++) {
@@ -646,6 +651,9 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 			vertices[j][i] = transedVertices4D[j][i] / transedVertices4D[j][3];
 			normals[j][i] = transedNormals4D[j][i] / transedNormals4D[j][3];
 		}
+		// HW 6
+		vertices[j][0] -= Xoffset;
+		vertices[j][1] -= Yoffset;
 	}
 
 	// Assign UV List:
@@ -764,24 +772,6 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 		}
 	}
 
-	// For texture color of Gouraud Shading:
-	/*
-	GzColor uvVertexColor[3] = {0};
-	if (interp_mode == GZ_COLOR && tex_fun != NULL) {
-		//GzTextureIndex currentUV;
-		
-		//currentUV[U] = -1.0f * (uPlaneA * (float)i + uPlaneB * (float)j + uPlaneD) / uPlaneC;
-		//currentUV[V] = -1.0f * (vPlaneA * (float)i + vPlaneB * (float)j + vPlaneD) / vPlaneC;
-
-		int status = tex_fun(uvList[0][U], uvList[0][V], uvVertexColor[0]);
-		status |= tex_fun(uvList[0][U], uvList[0][V], uvVertexColor[1]);
-		status |= tex_fun(uvList[0][U], uvList[0][V], uvVertexColor[2]);
-		if (status) {
-			return GZ_FAILURE;
-		}
-
-	}
-	*/
 	if (interp_mode == GZ_COLOR) {	// Gouraud Shading without texture
 		for (int j = 0; j < 3; j++) {	// j is vertex
 			for (int i = 0; i < numlights; i++) {	// i is light
@@ -929,22 +919,6 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 	float normalZ_PlaneB = -((normalZ_X1 * normalZ_Z2) - (normalZ_Z1 * normalZ_X2));
 	float normalZ_PlaneC = (normalZ_X1 * normalZ_Y2) - (normalZ_Y1 * normalZ_X2);
 	float normalZ_PlaneD = -1.0f * (normalZ_PlaneA * vertices[0][0] + normalZ_PlaneB * vertices[0][1] + normalZ_PlaneC * normals[0][2]);
-	/*
-	GzColor vertTextColor[3] = {0};
-	if (tex_fun != NULL) {
-
-		int status = tex_fun(uvList[0][U], uvList[0][V], vertTextColor[0]);
-		status |= tex_fun(uvList[1][U], uvList[1][V], vertTextColor[1]);
-		status |= tex_fun(uvList[2][U], uvList[2][V], vertTextColor[2]);
-		if (status) {
-			return GZ_FAILURE;
-		}
-
-		//char buffer[50];
-		//sprintf(buffer, "tex_fun = %4.4f, %4.4f", vertTextColor[0][0], vertTextColor[0][1]);
-		//OutputDebugStringA(buffer);
-	}
-	*/
 
 	// Perspective Correction:
 	float vZPrime;
@@ -978,7 +952,6 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 	float vPlaneC = (vX1 * vY2) - (vY1 * vX2);
 	float vPlaneD = -1.0f * (vPlaneA * vertices[0][0] + vPlaneB * vertices[0][1] + vPlaneC * perspUVList[0][1]);
 	
-
 	// Get Bounding Box:
 	float minX = min(min(vertices[0][0], vertices[1][0]), vertices[2][0]);
 	float maxX = max(max(vertices[0][0], vertices[1][0]), vertices[2][0]);
@@ -1150,7 +1123,6 @@ int GzRender::GzPutTriangle(int numParts, GzToken *nameList, GzPointer *valueLis
 							
 						}
 					
-
 					// Call GzPut to push the pixel to pixelbuffer.
 					GzPut(i, j, redIntensity, greenIntensity, blueIntensity, 1, currentZ);
 				}
@@ -1192,7 +1164,7 @@ int pushMatToStack(short &head, GzMatrix* matStack, GzMatrix mat) {
 	return GZ_SUCCESS;
 }
 
-int popMatToStack(short &head, GzMatrix* matStack) {
+int popMatFromStack(short &head, GzMatrix* matStack) {
 	if (head > -1) {
 		head--;
 	}
